@@ -1,0 +1,6 @@
+Item Code,Product,Make,Type,Size,UOM,Supplier,Cost,Price,Consumable,Animal,Stage
+HW-FC-001,Haiwan Raw Chicken Formula (Dog),Haiwan,food,1.5,KG,INHOUSE,18,42,yes,DOG,ADULT
+HW-NEW-010,Haiwan Dental Chew Sticks,Haiwan,treat,150,G,INHOUSE,6,18,yes,DOG,ANY
+ACA-DOG-001,Acana Wild Prairie Dog 2kg,Acana,food,2,KG,TRADING,58,95,yes,DOG,ADULT
+ACA-CAT-001,Acana Indoor Entree Cat 1.8kg,Acana,food,1.8,KG,TRADING,52,88,yes,CAT,ADULT
+HW-WIPE-001,Haiwan Pet Grooming Wipes (80ct),Haiwan,grooming,80,COUNT,INHOUSE,7,19,no,ANY,ANY

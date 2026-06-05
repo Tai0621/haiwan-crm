@@ -1,0 +1,146 @@
+import { prisma } from "@/lib/db";
+import Papa from "papaparse";
+
+// =============================================================================
+// CSV export — one route per table. Exports RAW columns (including ids and
+// foreign keys) so the data is a faithful, reconstructable migration artifact
+// for the future system. Dates are emitted as ISO-8601 strings.
+//
+//   GET /export/customers   /export/pets   /export/products
+//       /export/transactions   /export/lines   /export/subscriptions
+// =============================================================================
+
+export const dynamic = "force-dynamic";
+
+function iso(d: Date | null | undefined): string {
+  return d ? d.toISOString() : "";
+}
+
+type Rows = Record<string, string | number | boolean | null>[];
+
+async function buildRows(table: string): Promise<Rows | null> {
+  switch (table) {
+    case "customers": {
+      const rows = await prisma.customer.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((c) => ({
+        id: c.id,
+        phone: c.phone,
+        name: c.name,
+        email: c.email,
+        preferredStore: c.preferredStore,
+        marketingConsent: c.marketingConsent,
+        consentDate: iso(c.consentDate),
+        source: c.source,
+        needsDetails: c.needsDetails,
+        notes: c.notes,
+        createdAt: iso(c.createdAt),
+        updatedAt: iso(c.updatedAt),
+      }));
+    }
+    case "pets": {
+      const rows = await prisma.pet.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((p) => ({
+        id: p.id,
+        customerId: p.customerId,
+        name: p.name,
+        species: p.species,
+        breed: p.breed,
+        dateOfBirth: iso(p.dateOfBirth),
+        approxAgeMonths: p.approxAgeMonths,
+        weightKg: p.weightKg,
+        lifeStage: p.lifeStage,
+        dietaryNotes: p.dietaryNotes,
+        allergies: p.allergies,
+        createdAt: iso(p.createdAt),
+        updatedAt: iso(p.updatedAt),
+      }));
+    }
+    case "products": {
+      const rows = await prisma.product.findMany({ orderBy: { sku: "asc" } });
+      return rows.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        targetSpecies: p.targetSpecies,
+        lifeStage: p.lifeStage,
+        packSize: p.packSize,
+        packUnit: p.packUnit,
+        supplierType: p.supplierType,
+        costPrice: p.costPrice,
+        retailPrice: p.retailPrice,
+        isConsumable: p.isConsumable,
+        createdAt: iso(p.createdAt),
+        updatedAt: iso(p.updatedAt),
+      }));
+    }
+    case "transactions": {
+      const rows = await prisma.transaction.findMany({ orderBy: { transactionDate: "asc" } });
+      return rows.map((t) => ({
+        id: t.id,
+        customerId: t.customerId,
+        store: t.store,
+        transactionDate: iso(t.transactionDate),
+        storehubRef: t.storehubRef,
+        rawPhone: t.rawPhone,
+        totalAmount: t.totalAmount,
+        createdAt: iso(t.createdAt),
+      }));
+    }
+    case "lines": {
+      const rows = await prisma.transactionLine.findMany();
+      return rows.map((l) => ({
+        id: l.id,
+        transactionId: l.transactionId,
+        productId: l.productId,
+        petId: l.petId,
+        rawProductName: l.rawProductName,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal,
+      }));
+    }
+    case "subscriptions": {
+      const rows = await prisma.subscription.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((s) => ({
+        id: s.id,
+        customerId: s.customerId,
+        petId: s.petId,
+        productId: s.productId,
+        intervalDays: s.intervalDays,
+        nextDueDate: iso(s.nextDueDate),
+        status: s.status,
+        createdAt: iso(s.createdAt),
+        updatedAt: iso(s.updatedAt),
+      }));
+    }
+    default:
+      return null;
+  }
+}
+
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ table: string }> },
+) {
+  const { table } = await ctx.params;
+  const rows = await buildRows(table);
+
+  if (rows === null) {
+    return new Response(`Unknown table: ${table}`, { status: 404 });
+  }
+
+  // Papa.unparse handles quoting/escaping. Empty table -> header-less empty file
+  // is unhelpful, so emit at least an empty string.
+  const csv = rows.length > 0 ? Papa.unparse(rows) : "";
+  const date = new Date().toISOString().slice(0, 10);
+
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="haiwan-${table}-${date}.csv"`,
+    },
+  });
+}

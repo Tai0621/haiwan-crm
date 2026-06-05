@@ -1,0 +1,403 @@
+// =============================================================================
+// Haiwan CRM — Prisma Schema
+// SQLite · Prisma ORM · Next.js App Router
+//
+// MIGRATION HANDOFF NOTE (for the future outsourced team):
+//   • Phone numbers are stored in canonical Malaysian format: "60xxxxxxxxx"
+//     (country code + digits, no +, no spaces, no dashes).
+//   • The Pet is the core entity. TransactionLine.petId links each line item
+//     to the specific pet it was purchased for, enabling per-pet analytics.
+//   • product.isConsumable = true marks items eligible for refill prediction.
+//   • product.supplierType drives the revenue-mix dashboard (TRADING |
+//     CONSIGNMENT | INHOUSE).
+//   • customer.needsDetails = true flags stub records auto-created during
+//     StoreHub CSV import — staff should fill in names etc.
+//   • The SQLite file lives at ../data/haiwan.db relative to this schema.
+//     On Railway/Render, mount a persistent volume at that path.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+// Which physical store the transaction occurred at, or the customer prefers.
+// NONE means no preference recorded yet.
+enum Store {
+  KL
+  PJ
+  NONE
+}
+
+// How we first captured this customer.
+enum CustomerSource {
+  STOREHUB   // auto-created from a POS import
+  WHATSAPP   // captured via WhatsApp conversation
+  WALKIN     // staff manually entered at the counter
+  OTHER
+}
+
+// Pet species.
+enum Species {
+  DOG
+  CAT
+  OTHER
+}
+
+// Life stage of the pet — set manually or derived from age.
+enum LifeStage {
+  PUPPY_KITTEN  // < ~12 months
+  ADULT
+  SENIOR
+}
+
+// Pet sex.
+enum Sex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+// Which species a product targets.
+enum TargetSpecies {
+  DOG
+  CAT
+  ANY
+}
+
+// Life stage a product targets.
+enum ProductLifeStage {
+  PUPPY_KITTEN
+  ADULT
+  SENIOR
+  ANY
+}
+
+// Unit of measure for pack size.
+enum PackUnit {
+  G
+  KG
+  ML
+  L
+  COUNT
+}
+
+// Where Haiwan sources the product — the key dimension for the revenue-mix
+// north-star chart.
+//   TRADING     = bought and resold (lowest margin)
+//   CONSIGNMENT = supplier owns stock, Haiwan takes a cut
+//   INHOUSE     = Haiwan's own brand (highest margin, strategic priority)
+enum SupplierType {
+  TRADING
+  CONSIGNMENT
+  INHOUSE
+}
+
+// Subscription lifecycle state.
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+// Direction of a WhatsApp message relative to Haiwan.
+//   INBOUND  = customer -> Haiwan
+//   OUTBOUND = Haiwan  -> customer
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+// Which ingestion adapter produced a message. Lets us swap the live source
+// later (official Cloud API / unofficial bridge / a BSP provider) without
+// touching the storage or analysis layers.
+enum WhatsAppSource {
+  MANUAL      // pasted/imported chat export (the fallback that works today)
+  CLOUD_API   // Meta WhatsApp Business Platform webhook
+  BRIDGE      // unofficial web bridge (e.g. whatsapp-web.js)
+  PROVIDER    // a BSP/provider (Twilio, Wati, 360dialog, …)
+}
+
+// What the EOD analysis decided a message thread represents.
+enum LeadType {
+  ORDER             // an explicit order/purchase request
+  REFILL            // a top-up / restock of a consumable they already buy
+  PURCHASE_INTENT   // interest / "do you have…", price asks — not yet committed
+  INQUIRY           // general question, no buying signal
+  COMPLAINT         // problem / dissatisfaction to follow up
+  OTHER
+}
+
+// Review state of an extracted lead in the staff queue.
+enum LeadStatus {
+  PENDING    // awaiting staff review
+  CONFIRMED  // staff acknowledged / actioned
+  DISMISSED  // not actionable / false positive
+}
+
+// ---------------------------------------------------------------------------
+// Customer — the human contact and payer.
+// Phone is the identity key: unique, normalised to "60xxxxxxxxx" format.
+// ---------------------------------------------------------------------------
+model Customer {
+  id               String         @id @default(cuid())
+  phone            String         @unique  // canonical: "60123456789"
+  name             String?
+  email            String?
+  preferredStore   Store          @default(NONE)
+  marketingConsent Boolean        @default(false)  // PDPA opt-in
+  consentDate      DateTime?
+  source           CustomerSource @default(STOREHUB)
+  // true = stub record auto-created from import; staff should enrich later
+  needsDetails     Boolean        @default(false)
+  notes            String?
+
+  // Historical RFM figures imported from the StoreHub POS export. These are
+  // lifetime summaries (no line items), used to seed RFM for customers whose
+  // purchases predate this CRM. When present they take precedence over locally
+  // recorded transactions in RFM (avoids double-counting the same sale).
+  posSpent         Float?
+  posTransactions  Int?
+  posLastPurchase  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pets             Pet[]
+  transactions     Transaction[]
+  subscriptions    Subscription[]
+  whatsappMessages WhatsAppMessage[]
+  whatsappLeads    WhatsAppLead[]
+}
+
+// ---------------------------------------------------------------------------
+// Pet — the central entity of the CRM.
+// Every customer can have multiple pets; analytics and predictions are
+// computed per-pet wherever possible.
+// ---------------------------------------------------------------------------
+model Pet {
+  id             String     @id @default(cuid())
+  customerId     String
+  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  name           String
+  // Photo of the pet (stored as a downscaled data URL). Shown on the pets list
+  // and the pet profile.
+  photoUrl       String?
+  species        Species
+  breed          String?
+  sex            Sex?
+  // Spayed / neutered — relevant for diet and health guidance
+  neutered       Boolean    @default(false)
+  dateOfBirth    DateTime?
+  // Fallback when exact DOB is unknown; staff enters approximate age in months
+  approxAgeMonths Int?
+  // "Gotcha day" — when this pet joined the family (on-brand for "another parent")
+  adoptionDate   DateTime?
+  weightKg       Float?
+  // Manual life-stage override; if null, derive from age
+  lifeStage      LifeStage?
+  // Coat colour / distinguishing markings
+  colorMarkings  String?
+  // Microchip number, if known
+  microchipId    String?
+  // Regular vet / clinic
+  vetName        String?
+  dietaryNotes   String?
+  allergies      String?
+  // General free-text notes about the pet (temperament, preferences, etc.)
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactionLines TransactionLine[]
+  subscriptions    Subscription[]
+}
+
+// ---------------------------------------------------------------------------
+// Product — the item catalog.
+// isConsumable = true enables refill prediction for this product.
+// supplierType drives the revenue-mix chart.
+// ---------------------------------------------------------------------------
+model Product {
+  id            String           @id @default(cuid())
+  sku           String           @unique
+  name          String
+  brand         String?
+  // Free-text category: food, litter, treat, accessory, bed, supplement, …
+  category      String
+  targetSpecies TargetSpecies    @default(ANY)
+  lifeStage     ProductLifeStage @default(ANY)
+  packSize      Float?
+  packUnit      PackUnit?
+  // TRADING | CONSIGNMENT | INHOUSE — drives the north-star revenue-mix chart
+  supplierType  SupplierType     @default(TRADING)
+  costPrice     Float?
+  retailPrice   Float?
+  // Only consumables (food, litter) get refill-due predictions
+  isConsumable  Boolean          @default(false)
+
+  // On-hand stock per outlet (from the StoreHub export). Total available =
+  // stockKL + stockPJ.
+  stockKL       Int              @default(0)
+  stockPJ       Int              @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines         TransactionLine[]
+  subscriptions Subscription[]
+}
+
+// ---------------------------------------------------------------------------
+// Transaction — a sales event (one receipt / basket).
+// customerId is nullable: unmatched transactions are stored but not yet linked.
+// ---------------------------------------------------------------------------
+model Transaction {
+  id              String    @id @default(cuid())
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id])
+
+  store           Store
+  transactionDate DateTime
+  // StoreHub receipt reference — used for deduplication on re-import
+  storehubRef     String?
+  // Phone as it appeared in the raw CSV, kept for debugging match failures
+  rawPhone        String?
+  totalAmount     Float
+
+  createdAt DateTime @default(now())
+
+  lines TransactionLine[]
+}
+
+// ---------------------------------------------------------------------------
+// TransactionLine — one line item within a transaction.
+// petId: which pet this item is for (enables per-pet refill prediction).
+// productId: nullable if the SKU/name couldn't be matched to the catalog.
+// rawProductName: always kept so unmatched lines can be resolved later.
+// ---------------------------------------------------------------------------
+model TransactionLine {
+  id            String       @id @default(cuid())
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  productId     String?
+  product       Product?     @relation(fields: [productId], references: [id])
+
+  // Which pet this line item is for (optional; enriched by staff post-import)
+  petId         String?
+  pet           Pet?         @relation(fields: [petId], references: [id])
+
+  // Raw product name from the import; preserved even when productId is matched
+  rawProductName String
+  quantity       Float
+  unitPrice      Float
+  lineTotal      Float
+}
+
+// ---------------------------------------------------------------------------
+// Subscription — recurring order intent; basic CRUD only for now.
+// ---------------------------------------------------------------------------
+model Subscription {
+  id          String             @id @default(cuid())
+  customerId  String
+  customer    Customer           @relation(fields: [customerId], references: [id])
+
+  petId       String?
+  pet         Pet?               @relation(fields: [petId], references: [id])
+
+  productId   String
+  product     Product            @relation(fields: [productId], references: [id])
+
+  intervalDays Int
+  nextDueDate  DateTime
+  status       SubscriptionStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// WhatsAppMessage — one inbound or outbound WhatsApp message.
+//
+// Storage is deliberately source-agnostic: messages arrive via an ingestion
+// adapter (manual chat-export paste today; Cloud API / bridge / provider later)
+// and are normalised into this single table. customerId is nullable — a message
+// from an unknown number is still stored and linked once the customer exists.
+// `phone` is canonical "60xxxxxxxxx" so it matches Customer.phone.
+// `externalId` (when the source provides one) makes re-ingestion idempotent.
+// ---------------------------------------------------------------------------
+model WhatsAppMessage {
+  id          String           @id @default(cuid())
+  customerId  String?
+  customer    Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  phone       String           // canonical "60xxxxxxxxx"
+  rawPhone    String?          // as it arrived, for debugging match failures
+  contactName String?          // WhatsApp profile / saved name, if known
+  direction   MessageDirection @default(INBOUND)
+  body        String
+  timestamp   DateTime         // when the message was sent
+  source      WhatsAppSource   @default(MANUAL)
+  externalId  String?          @unique // provider message id, for dedup
+
+  // Set once the EOD analysis has processed this message, so re-runs don't
+  // re-analyse the same backlog.
+  analyzedAt  DateTime?
+
+  createdAt   DateTime         @default(now())
+
+  @@index([phone])
+  @@index([timestamp])
+  @@index([customerId])
+  @@index([analyzedAt])
+}
+
+// ---------------------------------------------------------------------------
+// WhatsAppLead — a structured signal extracted by the EOD analysis from one
+// customer's messages for a given day. Lands in a staff review queue.
+//
+// `evidence` holds the source message snippets the model reasoned over, so
+// staff can verify. `itemsJson` holds the structured line items the model
+// proposed (product name, qty, matched SKU/productId if found) as JSON.
+// ---------------------------------------------------------------------------
+model WhatsAppLead {
+  id           String     @id @default(cuid())
+  customerId   String?
+  customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  phone        String     // canonical, even when no customer record yet
+  contactName  String?
+
+  type         LeadType
+  // One-line, human-readable summary of what the customer wants.
+  summary      String
+  // Structured items the model proposed: JSON array of
+  // { productName, quantity, matchedProductId?, matchedSku? }.
+  itemsJson    String?
+  // Source message snippets the lead was derived from (newline-joined).
+  evidence     String?
+  // Model confidence 0..1.
+  confidence   Float      @default(0)
+
+  status       LeadStatus @default(PENDING)
+  // The business day this lead was analysed for (date-only semantics).
+  analysisDate DateTime
+
+  createdAt    DateTime   @default(now())
+  reviewedAt   DateTime?
+
+  @@index([status])
+  @@index([analysisDate])
+  @@index([customerId])
+}
