@@ -16,6 +16,7 @@ export async function login(formData: FormData) {
   const store = await cookies();
   store.set(AUTH_COOKIE, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // HTTPS-only once deployed
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30 days
