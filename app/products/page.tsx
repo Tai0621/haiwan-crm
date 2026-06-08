@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { rm } from "@/lib/format";
+import { rm, fmtDateTime } from "@/lib/format";
+import SyncButton from "@/app/wix/SyncButton";
 import {
   SUPPLIER_LABELS,
   SUPPLIER_COLORS,
@@ -38,6 +39,17 @@ export default async function ProductsPage({
     include: { _count: { select: { lines: true } } },
   });
 
+  // Wix inventory sync status (Wix is the source of truth for on-hand stock).
+  const wixConfigured = !!(process.env.WIX_API_KEY && process.env.WIX_SITE_ID);
+  const [wixSyncedCount, wixLast] = await Promise.all([
+    prisma.product.count({ where: { wixStock: { not: null } } }),
+    prisma.product.findFirst({
+      where: { wixSyncedAt: { not: null } },
+      orderBy: { wixSyncedAt: "desc" },
+      select: { wixSyncedAt: true },
+    }),
+  ]);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -53,6 +65,27 @@ export default async function ProductsPage({
         >
           + New product
         </Link>
+      </div>
+
+      {/* Wix inventory — source of truth for on-hand stock */}
+      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4">
+        {!wixConfigured && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">
+            <strong>Wix not configured.</strong> Set <code>WIX_API_KEY</code> and{" "}
+            <code>WIX_SITE_ID</code> in the environment to enable inventory syncing.
+          </div>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm">
+            <span className="font-medium text-slate-800">Wix inventory</span>
+            <span className="text-slate-400">
+              {" "}
+              · {wixSyncedCount} products with Wix stock · last synced{" "}
+              {wixLast?.wixSyncedAt ? fmtDateTime(wixLast.wixSyncedAt) : "never"}
+            </span>
+          </div>
+          <SyncButton disabled={!wixConfigured} />
+        </div>
       </div>
 
       <form className="bg-white border border-slate-200 rounded-lg p-3 mb-4 flex flex-wrap gap-3 items-end">
@@ -104,6 +137,7 @@ export default async function ProductsPage({
               <th className="px-4 py-2 font-medium text-right">Cost</th>
               <th className="px-4 py-2 font-medium text-right">Retail</th>
               <th className="px-4 py-2 font-medium text-center">Available</th>
+              <th className="px-4 py-2 font-medium text-center">Wix stock</th>
               <th className="px-4 py-2 font-medium text-center">Consumable</th>
               <th className="px-4 py-2 font-medium text-right">Sold</th>
               <th className="px-4 py-2 font-medium"></th>
@@ -153,6 +187,23 @@ export default async function ProductsPage({
                   })()}
                 </td>
                 <td className="px-4 py-2 text-center">
+                  {p.wixStock != null ? (
+                    <span
+                      className={`font-medium ${
+                        p.wixStock === 0
+                          ? "text-red-500"
+                          : p.wixStock <= 2
+                            ? "text-amber-600"
+                            : "text-slate-800"
+                      }`}
+                    >
+                      {p.wixStock}
+                    </span>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-center">
                   {p.isConsumable && (
                     <span className="inline-block text-[10px] font-medium uppercase tracking-wide bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">
                       Yes
@@ -169,7 +220,7 @@ export default async function ProductsPage({
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={12} className="px-4 py-8 text-center text-slate-400">
                   No products match your filters.
                 </td>
               </tr>
