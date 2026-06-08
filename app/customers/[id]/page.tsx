@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { deleteCustomer } from "../actions";
 import PetManager from "./PetManager";
+import AddTransactionForm from "@/app/transactions/AddTransactionForm";
 import { predictionsForCustomer } from "@/lib/refill";
 import { marginMixForCustomer, pct } from "@/lib/analytics";
 import { formatPhoneDisplay, whatsappLink } from "@/lib/phone";
@@ -47,6 +48,12 @@ export default async function CustomerDetailPage({
   const predictions = await predictionsForCustomer(id);
   const mix = await marginMixForCustomer(id);
   const wa = whatsappLink(customer.phone);
+
+  // Catalog for the manual "add transaction" line-item type-ahead.
+  const products = await prisma.product.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, sku: true, retailPrice: true },
+  });
 
   return (
     <div className="space-y-6">
@@ -212,9 +219,20 @@ export default async function CustomerDetailPage({
 
       {/* Purchase history */}
       <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-3">
-          Purchase history ({customer.transactions.length})
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Purchase history ({customer.transactions.length})
+          </h2>
+        </div>
+
+        <div className="mb-4">
+          <AddTransactionForm
+            products={products}
+            fixedCustomer={{ id: customer.id, name: customer.name, phone: customer.phone }}
+            returnTo={`/customers/${id}`}
+          />
+        </div>
+
         {customer.transactions.length === 0 ? (
           <p className="text-sm text-slate-400">No transactions yet.</p>
         ) : (
