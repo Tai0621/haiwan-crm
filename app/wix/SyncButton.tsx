@@ -35,19 +35,21 @@ export default function SyncButton({ disabled }: { disabled?: boolean }) {
           ) : (
             <>
               <p className="text-slate-800">
-                Updated <strong>{result.updated}</strong> products from{" "}
-                <strong>{result.unitCount}</strong> Wix variants ({result.wixProductCount} Wix
+                Updated <strong>{result.updated}</strong> products
+                {result.created > 0 && (
+                  <>
+                    {" "}
+                    and created <strong>{result.created}</strong> new
+                  </>
+                )}{" "}
+                from <strong>{result.unitCount}</strong> Wix variants ({result.wixProductCount} Wix
                 products).
                 {result.unmatched.length > 0 && (
                   <>
                     {" "}
-                    <span className="text-amber-700">{result.unmatched.length} not matched</span>
-                    {result.novelProducts.length > 0 && (
-                      <span className="text-slate-500">
-                        {" "}
-                        ({result.novelProducts.length} of them genuinely new to the CRM)
-                      </span>
-                    )}
+                    <span className="text-amber-700">
+                      {result.unmatched.length} need a name aligned
+                    </span>
                     .
                   </>
                 )}

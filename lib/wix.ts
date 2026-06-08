@@ -28,11 +28,15 @@ export interface WixSyncSummary {
   error?: string;
   wixProductCount: number; // base Wix products
   unitCount: number; // variant-level units (what we actually match)
-  updated: number; // CRM rows whose Wix stock was written
-  unmatched: string[]; // unit names with no CRM match (reported)
-  novelProducts: string[]; // base products with NO CRM presence at all (new to us)
+  updated: number; // existing CRM rows whose Wix stock was written
+  created: number; // genuinely-new products created as a single CRM row
+  unmatched: string[]; // unit names with no CRM match (near-misses, reported)
+  novelProducts: string[]; // base products created (new to the CRM)
   syncedAt: string;
 }
+
+// Category tag for auto-created products, so they're easy to find/clean up.
+const WIX_IMPORT_CATEGORY = "Wix import";
 
 interface WixVariant {
   choices?: Record<string, string>;
@@ -43,6 +47,7 @@ interface WixRawProduct {
   name: string;
   manageVariants?: boolean;
   stock?: { quantity?: number | null };
+  price?: { price?: number | null };
   variants?: WixVariant[];
 }
 
@@ -98,6 +103,19 @@ function unitsFor(p: WixRawProduct): SyncUnit[] {
   return [{ linkKey: p.id, name: p.name, quantity: p.stock?.quantity ?? null }];
 }
 
+/** Total on-hand across a product's units (null only if no unit tracks stock). */
+function totalQuantity(units: SyncUnit[]): number | null {
+  let sum = 0;
+  let any = false;
+  for (const u of units) {
+    if (u.quantity != null) {
+      sum += u.quantity;
+      any = true;
+    }
+  }
+  return any ? sum : null;
+}
+
 export async function syncWixInventory(): Promise<WixSyncSummary> {
   const syncedAt = new Date().toISOString();
   const base: WixSyncSummary = {
@@ -105,6 +123,7 @@ export async function syncWixInventory(): Promise<WixSyncSummary> {
     wixProductCount: 0,
     unitCount: 0,
     updated: 0,
+    created: 0,
     unmatched: [],
     novelProducts: [],
     syncedAt,
@@ -136,38 +155,56 @@ export async function syncWixInventory(): Promise<WixSyncSummary> {
 
   const claimed = new Set<string>();
   const updates: { crmId: string; linkKey: string; stock: number | null }[] = [];
+  const creates: { wixId: string; name: string; price: number | null; stock: number | null }[] = [];
 
   for (const p of products) {
     const units = unitsFor(p);
     base.unitCount += units.length;
-    let anyMatched = false;
-    const unmatchedHere: string[] = [];
 
+    // Match each variant unit to an existing CRM row.
+    const matchedHere: { crmId: string; linkKey: string; stock: number | null }[] = [];
+    const unmatchedHere: string[] = [];
     for (const u of units) {
       const crmId = byLink.get(u.linkKey) ?? byName.get(normalizeProductName(u.name)) ?? null;
       if (crmId && !claimed.has(crmId)) {
         claimed.add(crmId);
-        updates.push({ crmId, linkKey: u.linkKey, stock: u.quantity });
-        anyMatched = true;
+        matchedHere.push({ crmId, linkKey: u.linkKey, stock: u.quantity });
       } else {
         unmatchedHere.push(u.name);
       }
     }
 
-    if (unmatchedHere.length) {
+    if (matchedHere.length > 0) {
+      // Variant-split product already in the CRM: update matches; report any
+      // variants that didn't line up (a name to reconcile).
+      updates.push(...matchedHere);
       base.unmatched.push(...unmatchedHere);
-      // A base product is "novel" only if NONE of its units matched and its
-      // name has no fuzzy presence in the CRM — i.e. genuinely new to us.
-      if (!anyMatched) {
-        const bn = normalizeProductName(p.name);
-        const fuzzy = crmNorms.some((cn) => cn.length >= 4 && (cn.includes(bn) || bn.includes(cn)));
-        if (!fuzzy) base.novelProducts.push(p.name);
-      }
+      continue;
+    }
+
+    // No variant matched. Decide what this product is.
+    const totalStock = totalQuantity(units);
+    const baseLinked = byLink.get(p.id);
+    if (baseLinked && !claimed.has(baseLinked)) {
+      // A single row we auto-created on a previous sync — refresh its total.
+      claimed.add(baseLinked);
+      updates.push({ crmId: baseLinked, linkKey: p.id, stock: totalStock });
+      continue;
+    }
+    const bn = normalizeProductName(p.name);
+    const fuzzy = crmNorms.some((cn) => cn.length >= 4 && (cn.includes(bn) || bn.includes(cn)));
+    if (fuzzy) {
+      // Near-miss: exists in the CRM under a different name — report, don't dup.
+      base.unmatched.push(...unmatchedHere);
+    } else {
+      // Genuinely new — create one CRM row for the whole product.
+      creates.push({ wixId: p.id, name: p.name, price: p.price?.price ?? null, stock: totalStock });
+      base.novelProducts.push(p.name);
     }
   }
 
-  // Apply updates in small concurrent batches (independent rows; no transaction
-  // — avoids Prisma's interactive-transaction timeout against a remote DB).
+  // Apply in small concurrent batches (independent rows; no transaction — avoids
+  // Prisma's interactive-transaction timeout against a remote DB).
   const now = new Date();
   const CONCURRENCY = 15;
   for (let i = 0; i < updates.length; i += CONCURRENCY) {
@@ -181,6 +218,30 @@ export async function syncWixInventory(): Promise<WixSyncSummary> {
       ),
     );
     base.updated += chunk.length;
+  }
+
+  // Create genuinely-new products as one row each. Upsert on wixProductId so a
+  // re-run updates rather than duplicates. Synthetic SKU (Wix has none).
+  for (let i = 0; i < creates.length; i += CONCURRENCY) {
+    const chunk = creates.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map((c) =>
+        prisma.product.upsert({
+          where: { wixProductId: c.wixId },
+          create: {
+            sku: `WIX-${c.wixId}`,
+            name: c.name,
+            category: WIX_IMPORT_CATEGORY,
+            retailPrice: c.price,
+            wixProductId: c.wixId,
+            wixStock: c.stock,
+            wixSyncedAt: now,
+          },
+          update: { wixStock: c.stock, wixSyncedAt: now },
+        }),
+      ),
+    );
+    base.created += chunk.length;
   }
 
   return base;
