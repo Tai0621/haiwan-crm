@@ -35,13 +35,16 @@ export default function CustomerForm({ customer }: { customer?: CustomerLike }) 
         </label>
         <input
           name="phone"
+          type="tel"
+          inputMode="tel"
           required
           defaultValue={customer?.phone ?? ""}
-          placeholder="012-345 6789"
+          placeholder="012-345 6789  or  +1 415 555 1234"
           className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
         />
         <p className="text-xs text-slate-400 mt-1">
-          Stored canonically as 60XXXXXXXXX — the identity key.
+          Malaysian numbers can be typed plainly (e.g. 012-345 6789). For customers
+          outside Malaysia, include the country code with a “+” (e.g. +65 8123 4567).
         </p>
       </div>
 
