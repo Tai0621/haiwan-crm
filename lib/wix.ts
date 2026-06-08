@@ -86,16 +86,58 @@ async function fetchAllWixProducts(key: string, site: string): Promise<WixRawPro
   return out;
 }
 
+/**
+ * Canonicalise a Wix option VALUE toward the CRM's vocabulary so the variant
+ * names line up. Currently handles the verbose "Deboss/Stamping" option:
+ *   "I do not want to deboss…"            -> "no stamping"
+ *   "Deboss my Haiwan's collar for RM 20" -> "stamping add on rm 20"
+ * Any value without a deboss/stamp keyword is returned unchanged (no-op for
+ * colours, sizes, scents, etc.).
+ */
+function canonicalizeOptionValue(v: string): string {
+  const t = v.toLowerCase();
+  if (!/deboss|stamp/.test(t)) return v;
+  if (/\bno\b|\bnot\b|don'?t/.test(t)) return "nostamp";
+  const m = t.match(/rm\s*(\d+)/);
+  return m ? `stamp${m[1]}` : "stamp";
+}
+
+/**
+ * Collapse the CRM's *inconsistent* stamping wording to the same neutral tokens
+ * the Wix side uses ("nostamp" / "stampN"). The CRM mixes phrasings across
+ * products — e.g. "NO STAMPING" vs "NO ADD ONS", "STAMPING ADD ON RM 10" vs
+ * "STAMP RM 20" — so both sides must be reduced for the names to line up.
+ */
+function normalizeStampingPhrase(name: string): string {
+  return name
+    .replace(/no add ?ons|no stamping/gi, " nostamp ")
+    .replace(/(?:stamping add on|stamp(?:ing)?)\s*rm\s*(\d+)/gi, " stamp$1 ");
+}
+
+/** Canonical key for matching a product/variant name on either side. */
+function matchKey(name: string): string {
+  return normalizeProductName(normalizeStampingPhrase(name));
+}
+
+/** Order-independent, de-duplicated token signature (handles reordered names
+ *  and harmless repeated tokens, e.g. "NOU … NOU"). */
+function tokenSignature(name: string): string {
+  return [...new Set(matchKey(name).split(" ").filter(Boolean))].sort().join(" ");
+}
+
 /** Expand a Wix product into matchable units (one per managed variant, else one). */
 function unitsFor(p: WixRawProduct): SyncUnit[] {
   const variants = p.variants ?? [];
   const managed = !!p.manageVariants && variants.some((v) => v.choices && Object.keys(v.choices).length > 0);
   if (managed) {
     return variants.map((v) => {
-      const values = Object.values(v.choices ?? {});
+      const raw = Object.values(v.choices ?? {});
+      const canon = raw.map(canonicalizeOptionValue);
       return {
-        linkKey: `${p.id}#${values.join("/")}`,
-        name: `${p.name} ${values.join(" ")}`,
+        // linkKey uses the raw choices so it stays stable across vocab tweaks.
+        linkKey: `${p.id}#${raw.join("/")}`,
+        // name uses canonicalised values so it matches the CRM's wording.
+        name: `${p.name} ${canon.join(" ")}`,
         quantity: v.stock?.quantity ?? null,
       };
     });
@@ -145,10 +187,16 @@ export async function syncWixInventory(): Promise<WixSyncSummary> {
   });
   const byName = new Map<string, string>();
   const crmNorms: string[] = [];
+  // Token-signature index (sorted tokens) for order-independent matching.
+  const bySig = new Map<string, string[]>();
   for (const p of crm) {
-    const n = normalizeProductName(p.name);
+    const n = matchKey(p.name);
     byName.set(n, p.id);
     crmNorms.push(n);
+    const sig = tokenSignature(p.name);
+    const arr = bySig.get(sig);
+    if (arr) arr.push(p.id);
+    else bySig.set(sig, [p.id]);
   }
   const byLink = new Map<string, string>();
   for (const p of crm) if (p.wixProductId) byLink.set(p.wixProductId, p.id);
@@ -165,7 +213,15 @@ export async function syncWixInventory(): Promise<WixSyncSummary> {
     const matchedHere: { crmId: string; linkKey: string; stock: number | null }[] = [];
     const unmatchedHere: string[] = [];
     for (const u of units) {
-      const crmId = byLink.get(u.linkKey) ?? byName.get(normalizeProductName(u.name)) ?? null;
+      // 1) prior-sync link  2) exact (canonicalised) name  3) token-set (reorder)
+      let crmId = byLink.get(u.linkKey) ?? byName.get(matchKey(u.name)) ?? null;
+      if (!crmId) {
+        const sigHits = bySig.get(tokenSignature(u.name));
+        if (sigHits) {
+          const free = sigHits.filter((id) => !claimed.has(id));
+          if (free.length === 1) crmId = free[0]; // unique -> safe
+        }
+      }
       if (crmId && !claimed.has(crmId)) {
         claimed.add(crmId);
         matchedHere.push({ crmId, linkKey: u.linkKey, stock: u.quantity });
@@ -191,7 +247,7 @@ export async function syncWixInventory(): Promise<WixSyncSummary> {
       updates.push({ crmId: baseLinked, linkKey: p.id, stock: totalStock });
       continue;
     }
-    const bn = normalizeProductName(p.name);
+    const bn = matchKey(p.name);
     const fuzzy = crmNorms.some((cn) => cn.length >= 4 && (cn.includes(bn) || bn.includes(cn)));
     if (fuzzy) {
       // Near-miss: exists in the CRM under a different name — report, don't dup.
