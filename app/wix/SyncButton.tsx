@@ -35,17 +35,17 @@ export default function SyncButton({ disabled }: { disabled?: boolean }) {
           ) : (
             <>
               <p className="text-slate-800">
-                Synced <strong>{result.updated}</strong> products from{" "}
-                <strong>{result.wixProductCount}</strong> in Wix.
+                Updated <strong>{result.updated}</strong> products from{" "}
+                <strong>{result.unitCount}</strong> Wix variants ({result.wixProductCount} Wix
+                products).
                 {result.unmatched.length > 0 && (
                   <>
                     {" "}
-                    <span className="text-amber-700">
-                      {result.unmatched.length} not matched
-                    </span>
-                    {result.ambiguous.length > 0 && (
-                      <span className="text-amber-700">
-                        , {result.ambiguous.length} ambiguous
+                    <span className="text-amber-700">{result.unmatched.length} not matched</span>
+                    {result.novelProducts.length > 0 && (
+                      <span className="text-slate-500">
+                        {" "}
+                        ({result.novelProducts.length} of them genuinely new to the CRM)
                       </span>
                     )}
                     .
@@ -58,24 +58,19 @@ export default function SyncButton({ disabled }: { disabled?: boolean }) {
                     onClick={() => setShowUnmatched((s) => !s)}
                     className="text-xs text-slate-500 underline"
                   >
-                    {showUnmatched ? "Hide" : "Show"} unmatched Wix products
+                    {showUnmatched ? "Hide" : "Show"} unmatched Wix items
                   </button>
                   {showUnmatched && (
                     <ul className="mt-1 max-h-48 overflow-auto text-xs text-slate-600 list-disc pl-5">
                       {result.unmatched.map((n, i) => (
                         <li key={i}>{n}</li>
                       ))}
-                      {result.ambiguous.map((n, i) => (
-                        <li key={`a${i}`} className="text-amber-600">
-                          {n} (ambiguous — name matched an already-synced product)
-                        </li>
-                      ))}
                     </ul>
                   )}
                 </div>
               )}
               <p className="text-xs text-slate-400 mt-1">
-                Tip: rename an unmatched Wix product (or its CRM product) to match exactly, then
+                Tip: rename an unmatched Wix item (or its CRM product) so the names match, then
                 re-sync — the link is remembered afterwards.
               </p>
             </>
