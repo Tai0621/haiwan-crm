@@ -247,9 +247,17 @@ model Product {
   isConsumable  Boolean          @default(false)
 
   // On-hand stock per outlet (from the StoreHub export). Total available =
-  // stockKL + stockPJ.
+  // stockKL + stockPJ. Kept as legacy reference once Wix sync is live.
   stockKL       Int              @default(0)
   stockPJ       Int              @default(0)
+
+  // --- Wix inventory sync (Wix is the source of truth for on-hand stock) ---
+  // Wix has no SKUs, so products are matched by name on first sync; the matched
+  // Wix product id is stored for fast, exact re-syncs afterwards. wixStock is
+  // the authoritative total on-hand (Wix tracks one pool, not per-store).
+  wixProductId  String?          @unique
+  wixStock      Int?
+  wixSyncedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

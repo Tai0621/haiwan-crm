@@ -11,6 +11,7 @@ const LINKS: Array<{ href: string; label: string }> = [
   { href: "/customers", label: "Customers" },
   { href: "/transactions", label: "Transactions" },
   { href: "/products", label: "Products" },
+  { href: "/wix", label: "Wix" },
   { href: "/analysis", label: "Analysis" },
   { href: "/revenue", label: "Revenue mix" },
   { href: "/subscriptions", label: "Subscriptions" },
