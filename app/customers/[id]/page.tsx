@@ -50,28 +50,6 @@ export default async function CustomerDetailPage({
   const mix = await marginMixForCustomer(id);
   const wa = whatsappLink(customer.phone);
 
-  // Existing unlinked transactions, for attaching purchase history (staff link
-  // an already-imported transaction rather than creating a new one).
-  const unlinkedRaw = await prisma.transaction.findMany({
-    where: { customerId: null },
-    orderBy: { transactionDate: "desc" },
-    select: {
-      id: true,
-      transactionDate: true,
-      store: true,
-      totalAmount: true,
-      storehubRef: true,
-      lines: { select: { rawProductName: true, product: { select: { name: true } } }, take: 3 },
-    },
-  });
-  const unlinkedTxns = unlinkedRaw.map((t) => {
-    const items = t.lines.map((l) => l.product?.name ?? l.rawProductName).filter(Boolean).join(", ");
-    return {
-      id: t.id,
-      // Label must be unique (the picker maps it back to an id) -> append ref/id.
-      label: `${fmtDate(t.transactionDate)} · ${STORE_LABELS[t.store]} · ${rm(t.totalAmount)}${items ? ` · ${items}` : ""} · #${t.storehubRef ?? t.id.slice(-5)}`,
-    };
-  });
 
   return (
     <div className="space-y-6">
@@ -244,7 +222,7 @@ export default async function CustomerDetailPage({
         </div>
 
         <div className="mb-4">
-          <LinkTransactionForm customerId={id} unlinked={unlinkedTxns} />
+          <LinkTransactionForm customerId={id} />
         </div>
 
         {customer.transactions.length === 0 ? (

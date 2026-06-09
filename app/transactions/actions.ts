@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { rm, fmtDate } from "@/lib/format";
+import { STORE_LABELS } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
 // Transaction actions — manual entry of in-store sales that aren't covered by
@@ -129,4 +131,44 @@ export async function unlinkTransaction(formData: FormData) {
   revalidatePath("/customers");
   revalidatePath("/transactions");
   revalidatePath("/revenue");
+}
+
+// Search UNLINKED transactions for the customer-page picker. Returns a small
+// page of matches (never the whole table) so the customer page stays light.
+export async function searchUnlinkedTransactions(
+  query: string,
+): Promise<{ id: string; label: string }[]> {
+  const q = query.trim();
+  const or: Array<Record<string, unknown>> = [];
+  if (q) {
+    or.push({ storehubRef: { contains: q } });
+    or.push({ lines: { some: { rawProductName: { contains: q } } } });
+    or.push({ lines: { some: { product: { name: { contains: q } } } } });
+    const num = parseFloat(q);
+    if (!Number.isNaN(num)) or.push({ totalAmount: num });
+    if (/\b(kl|kuala)\b/i.test(q)) or.push({ store: "KL" });
+    if (/\b(pj|petaling)\b/i.test(q)) or.push({ store: "PJ" });
+  }
+
+  const txns = await prisma.transaction.findMany({
+    where: { customerId: null, ...(or.length ? { OR: or } : {}) },
+    orderBy: { transactionDate: "desc" },
+    take: 25,
+    select: {
+      id: true,
+      transactionDate: true,
+      store: true,
+      totalAmount: true,
+      storehubRef: true,
+      lines: { select: { rawProductName: true, product: { select: { name: true } } }, take: 3 },
+    },
+  });
+
+  return txns.map((t) => {
+    const items = t.lines.map((l) => l.product?.name ?? l.rawProductName).filter(Boolean).join(", ");
+    return {
+      id: t.id,
+      label: `${fmtDate(t.transactionDate)} · ${STORE_LABELS[t.store]} · ${rm(t.totalAmount)}${items ? ` · ${items}` : ""}${t.storehubRef ? ` · #${t.storehubRef}` : ""}`,
+    };
+  });
 }
