@@ -22,11 +22,15 @@ export default async function CustomersPage({
   const where: Record<string, unknown> = {};
   if (q && q.trim()) {
     const term = q.trim();
-    where.OR = [
+    const digits = term.replace(/\D/g, "");
+    const or: Array<Record<string, unknown>> = [
       { name: { contains: term } },
-      { phone: { contains: term.replace(/\D/g, "") } },
       { email: { contains: term } },
     ];
+    // Only match on phone when the term actually has digits — otherwise
+    // `phone contains ""` matches every customer and the name search returns all.
+    if (digits) or.push({ phone: { contains: digits } });
+    where.OR = or;
   }
   if (store && store !== "ALL") where.preferredStore = store;
   if (needs === "1") where.needsDetails = true;
