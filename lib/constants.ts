@@ -57,6 +57,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   STOREHUB: "StoreHub",
   WHATSAPP: "WhatsApp",
   WALKIN: "Walk-in",
+  TYPEFORM: "Typeform",
   OTHER: "Other",
 };
 

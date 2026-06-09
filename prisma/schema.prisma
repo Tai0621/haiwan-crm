@@ -42,6 +42,7 @@ enum CustomerSource {
   STOREHUB   // auto-created from a POS import
   WHATSAPP   // captured via WhatsApp conversation
   WALKIN     // staff manually entered at the counter
+  TYPEFORM   // submitted a Typeform customer/pet details form
   OTHER
 }
 
