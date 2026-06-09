@@ -92,3 +92,41 @@ export async function deleteTransaction(formData: FormData) {
   revalidatePath("/revenue");
   redirect(returnTo || "/transactions");
 }
+
+// ---------------------------------------------------------------------------
+// Link / unlink an EXISTING (imported) transaction to a customer. This is how
+// purchase history is attached on the customer page — staff pick from already
+// imported transactions rather than re-keying a new one.
+// ---------------------------------------------------------------------------
+
+export async function linkTransaction(formData: FormData) {
+  const transactionId = String(formData.get("transactionId") ?? "").trim();
+  const customerId = String(formData.get("customerId") ?? "").trim();
+  if (!transactionId) throw new Error("Please choose a transaction to link.");
+  if (!customerId) throw new Error("Missing customer.");
+
+  await prisma.transaction.update({
+    where: { id: transactionId },
+    data: { customerId },
+  });
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  revalidatePath("/transactions");
+  revalidatePath("/revenue");
+}
+
+export async function unlinkTransaction(formData: FormData) {
+  const transactionId = String(formData.get("transactionId") ?? "").trim();
+  const customerId = String(formData.get("customerId") ?? "").trim();
+
+  await prisma.transaction.update({
+    where: { id: transactionId },
+    data: { customerId: null },
+  });
+
+  if (customerId) revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  revalidatePath("/transactions");
+  revalidatePath("/revenue");
+}

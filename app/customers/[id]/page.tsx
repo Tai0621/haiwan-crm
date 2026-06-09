@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { deleteCustomer } from "../actions";
 import PetManager from "./PetManager";
-import AddTransactionForm from "@/app/transactions/AddTransactionForm";
+import LinkTransactionForm from "@/app/transactions/LinkTransactionForm";
+import { unlinkTransaction } from "@/app/transactions/actions";
 import { predictionsForCustomer } from "@/lib/refill";
 import { marginMixForCustomer, pct } from "@/lib/analytics";
 import { formatPhoneDisplay, whatsappLink } from "@/lib/phone";
@@ -49,10 +50,27 @@ export default async function CustomerDetailPage({
   const mix = await marginMixForCustomer(id);
   const wa = whatsappLink(customer.phone);
 
-  // Catalog for the manual "add transaction" line-item type-ahead.
-  const products = await prisma.product.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, sku: true, retailPrice: true },
+  // Existing unlinked transactions, for attaching purchase history (staff link
+  // an already-imported transaction rather than creating a new one).
+  const unlinkedRaw = await prisma.transaction.findMany({
+    where: { customerId: null },
+    orderBy: { transactionDate: "desc" },
+    select: {
+      id: true,
+      transactionDate: true,
+      store: true,
+      totalAmount: true,
+      storehubRef: true,
+      lines: { select: { rawProductName: true, product: { select: { name: true } } }, take: 3 },
+    },
+  });
+  const unlinkedTxns = unlinkedRaw.map((t) => {
+    const items = t.lines.map((l) => l.product?.name ?? l.rawProductName).filter(Boolean).join(", ");
+    return {
+      id: t.id,
+      // Label must be unique (the picker maps it back to an id) -> append ref/id.
+      label: `${fmtDate(t.transactionDate)} · ${STORE_LABELS[t.store]} · ${rm(t.totalAmount)}${items ? ` · ${items}` : ""} · #${t.storehubRef ?? t.id.slice(-5)}`,
+    };
   });
 
   return (
@@ -226,11 +244,7 @@ export default async function CustomerDetailPage({
         </div>
 
         <div className="mb-4">
-          <AddTransactionForm
-            products={products}
-            fixedCustomer={{ id: customer.id, name: customer.name, phone: customer.phone }}
-            returnTo={`/customers/${id}`}
-          />
+          <LinkTransactionForm customerId={id} unlinked={unlinkedTxns} />
         </div>
 
         {customer.transactions.length === 0 ? (
@@ -243,7 +257,19 @@ export default async function CustomerDetailPage({
                   <span className="font-medium text-slate-800">
                     {fmtDateTime(t.transactionDate)} · {STORE_LABELS[t.store]}
                   </span>
-                  <span className="text-slate-600">{rm(t.totalAmount)}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="text-slate-600">{rm(t.totalAmount)}</span>
+                    <form action={unlinkTransaction}>
+                      <input type="hidden" name="transactionId" value={t.id} />
+                      <input type="hidden" name="customerId" value={id} />
+                      <button
+                        className="text-xs text-slate-400 hover:text-red-600 hover:underline"
+                        title="Detach this transaction from the customer"
+                      >
+                        Unlink
+                      </button>
+                    </form>
+                  </span>
                 </div>
                 {t.storehubRef && (
                   <div className="text-xs text-slate-400">Ref: {t.storehubRef}</div>
