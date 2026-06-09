@@ -8,24 +8,17 @@ import { deleteTransaction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function TransactionsPage() {
-  const [transactions, customers, products] = await Promise.all([
-    prisma.transaction.findMany({
-      orderBy: { transactionDate: "desc" },
-      take: 100,
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-        _count: { select: { lines: true } },
-      },
-    }),
-    prisma.customer.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, phone: true },
-    }),
-    prisma.product.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, sku: true, retailPrice: true },
-    }),
-  ]);
+  // Only the recent list is needed to render the page. The product catalogue and
+  // customer list for the "Add transaction" form are loaded on demand when the
+  // form is opened (see AddTransactionForm lazy mode) so this page stays fast.
+  const transactions = await prisma.transaction.findMany({
+    orderBy: { transactionDate: "desc" },
+    take: 100,
+    include: {
+      customer: { select: { id: true, name: true, phone: true } },
+      _count: { select: { lines: true } },
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -41,7 +34,7 @@ export default async function TransactionsPage() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <AddTransactionForm products={products} customers={customers} returnTo="/transactions" />
+        <AddTransactionForm lazy returnTo="/transactions" />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-6">

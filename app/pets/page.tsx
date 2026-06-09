@@ -3,8 +3,11 @@ import { prisma } from "@/lib/db";
 import { rm } from "@/lib/format";
 import { SPECIES_LABELS, LIFESTAGE_LABELS } from "@/lib/constants";
 import { effectiveStage } from "@/lib/analytics";
+import Pagination from "@/app/components/Pagination";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 30;
 
 function ageLabel(dob: Date | null, approx: number | null): string {
   let months = approx;
@@ -18,10 +21,10 @@ function ageLabel(dob: Date | null, approx: number | null): string {
   return rem ? `${years}y ${rem}m` : `${years}y`;
 }
 
-type SearchParams = Promise<{ q?: string; species?: string; stage?: string }>;
+type SearchParams = Promise<{ q?: string; species?: string; stage?: string; page?: string }>;
 
 export default async function PetsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { q, species, stage } = await searchParams;
+  const { q, species, stage, page: pageParam } = await searchParams;
 
   const where: Record<string, unknown> = {};
   if (q && q.trim()) {
@@ -35,14 +38,22 @@ export default async function PetsPage({ searchParams }: { searchParams: SearchP
   if (species && species !== "ALL") where.species = species;
   if (stage && stage !== "ALL") where.lifeStage = stage;
 
-  const pets = await prisma.pet.findMany({
-    where,
-    orderBy: [{ species: "asc" }, { name: "asc" }],
-    include: {
-      customer: { select: { id: true, name: true, phone: true } },
-      transactionLines: { select: { lineTotal: true } },
-    },
-  });
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+
+  const [totalCount, pets] = await Promise.all([
+    prisma.pet.count({ where }),
+    prisma.pet.findMany({
+      where,
+      orderBy: [{ species: "asc" }, { name: "asc" }],
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        transactionLines: { select: { lineTotal: true } },
+      },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const withSpend = pets.map((p) => ({
     ...p,
@@ -54,7 +65,7 @@ export default async function PetsPage({ searchParams }: { searchParams: SearchP
     <div>
       <div className="flex items-baseline justify-between mb-1">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Pets</h1>
-        <span className="text-sm text-slate-500">{pets.length} pets</span>
+        <span className="text-sm text-slate-500">{totalCount.toLocaleString()} pets</span>
       </div>
       <p className="text-sm text-slate-500 mb-5">
         Open a pet to see its profile, health notes, refill timing and spend.
@@ -161,6 +172,18 @@ export default async function PetsPage({ searchParams }: { searchParams: SearchP
           </div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <Pagination
+            basePath="/pets"
+            params={{ q, species, stage }}
+            page={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+          />
+        </div>
+      )}
     </div>
   );
 }

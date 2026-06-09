@@ -2,13 +2,17 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { STORE_LABELS, SOURCE_LABELS } from "@/lib/constants";
+import Pagination from "@/app/components/Pagination";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 50;
 
 type SearchParams = Promise<{
   q?: string;
   store?: string;
   needs?: string;
+  page?: string;
 }>;
 
 export default async function CustomersPage({
@@ -16,7 +20,7 @@ export default async function CustomersPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { q, store, needs } = await searchParams;
+  const { q, store, needs, page: pageParam } = await searchParams;
 
   // Build the filter
   const where: Record<string, unknown> = {};
@@ -35,14 +39,22 @@ export default async function CustomersPage({
   if (store && store !== "ALL") where.preferredStore = store;
   if (needs === "1") where.needsDetails = true;
 
-  const customers = await prisma.customer.findMany({
-    where,
-    orderBy: [{ needsDetails: "desc" }, { updatedAt: "desc" }],
-    include: {
-      pets: { select: { id: true, name: true, species: true } },
-      _count: { select: { transactions: true } },
-    },
-  });
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+
+  const [totalCount, customers] = await Promise.all([
+    prisma.customer.count({ where }),
+    prisma.customer.findMany({
+      where,
+      orderBy: [{ needsDetails: "desc" }, { updatedAt: "desc" }],
+      include: {
+        pets: { select: { id: true, name: true, species: true } },
+        _count: { select: { transactions: true } },
+      },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <div>
@@ -50,7 +62,7 @@ export default async function CustomersPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Customers</h1>
           <p className="text-sm text-slate-500">
-            {customers.length} {customers.length === 1 ? "result" : "results"}
+            {totalCount.toLocaleString()} {totalCount === 1 ? "result" : "results"}
           </p>
         </div>
         <Link
@@ -158,6 +170,13 @@ export default async function CustomersPage({
             )}
           </tbody>
         </table>
+        <Pagination
+          basePath="/customers"
+          params={{ q, store, needs }}
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+        />
       </div>
     </div>
   );

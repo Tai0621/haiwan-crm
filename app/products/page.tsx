@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { rm, fmtDateTime } from "@/lib/format";
 import SyncButton from "@/app/wix/SyncButton";
+import Pagination from "@/app/components/Pagination";
 import {
   SUPPLIER_LABELS,
   SUPPLIER_COLORS,
@@ -11,14 +12,16 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ q?: string; supplier?: string; consumable?: string }>;
+const PAGE_SIZE = 50;
+
+type SearchParams = Promise<{ q?: string; supplier?: string; consumable?: string; page?: string }>;
 
 export default async function ProductsPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const { q, supplier, consumable } = await searchParams;
+  const { q, supplier, consumable, page: pageParam } = await searchParams;
 
   const where: Record<string, unknown> = {};
   if (q && q.trim()) {
@@ -33,11 +36,19 @@ export default async function ProductsPage({
   if (supplier && supplier !== "ALL") where.supplierType = supplier;
   if (consumable === "1") where.isConsumable = true;
 
-  const products = await prisma.product.findMany({
-    where,
-    orderBy: [{ category: "asc" }, { name: "asc" }],
-    include: { _count: { select: { lines: true } } },
-  });
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+
+  const [totalCount, products] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+      include: { _count: { select: { lines: true } } },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // Wix inventory sync status (Wix is the source of truth for on-hand stock).
   const wixConfigured = !!(process.env.WIX_API_KEY && process.env.WIX_SITE_ID);
@@ -56,7 +67,7 @@ export default async function ProductsPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Products</h1>
           <p className="text-sm text-slate-500">
-            {products.length} {products.length === 1 ? "product" : "products"}
+            {totalCount.toLocaleString()} {totalCount === 1 ? "product" : "products"}
           </p>
         </div>
         <Link
@@ -227,6 +238,13 @@ export default async function ProductsPage({
             )}
           </tbody>
         </table>
+        <Pagination
+          basePath="/products"
+          params={{ q, supplier, consumable }}
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+        />
       </div>
     </div>
   );

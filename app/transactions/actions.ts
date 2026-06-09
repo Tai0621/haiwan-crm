@@ -47,6 +47,26 @@ function linesFromForm(formData: FormData) {
   return lines;
 }
 
+// Options for the manual "Add transaction" form. Fetched on demand (when the
+// staff actually open the form) so the Transactions page itself stays light —
+// otherwise every page load ships the whole product catalogue + customer list.
+export async function getTransactionFormOptions(): Promise<{
+  products: { id: string; name: string; sku: string; retailPrice: number | null }[];
+  customers: { id: string; name: string | null; phone: string }[];
+}> {
+  const [products, customers] = await Promise.all([
+    prisma.product.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, sku: true, retailPrice: true },
+    }),
+    prisma.customer.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, phone: true },
+    }),
+  ]);
+  return { products, customers };
+}
+
 export async function createTransaction(formData: FormData) {
   const customerId = String(formData.get("customerId") ?? "").trim();
   if (!customerId) throw new Error("Please choose a customer.");

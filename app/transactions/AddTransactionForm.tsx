@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createTransaction } from "./actions";
+import { createTransaction, getTransactionFormOptions } from "./actions";
 import { rm } from "@/lib/format";
 
 export type ProductOpt = {
@@ -29,19 +29,45 @@ const newRow = (): LineRow => ({
 });
 
 export default function AddTransactionForm({
-  products,
-  customers,
+  products: productsProp,
+  customers: customersProp,
   fixedCustomer,
   returnTo,
+  lazy = false,
 }: {
-  products: ProductOpt[];
+  products?: ProductOpt[];
   customers?: CustomerOpt[];
   fixedCustomer?: CustomerOpt;
   returnTo?: string;
+  // When true, the product/customer lists are fetched the first time the form
+  // is opened instead of being passed in — keeps the host page payload small.
+  lazy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<LineRow[]>([newRow()]);
   const [dateVal, setDateVal] = useState("");
+
+  // Lazily-loaded options (only used when `lazy` and no props were supplied).
+  const [loadedProducts, setLoadedProducts] = useState<ProductOpt[] | null>(null);
+  const [loadedCustomers, setLoadedCustomers] = useState<CustomerOpt[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const products = productsProp ?? loadedProducts ?? [];
+  const customers = customersProp ?? loadedCustomers ?? undefined;
+
+  async function handleOpen() {
+    setOpen(true);
+    if (lazy && !productsProp && loadedProducts === null && !loading) {
+      setLoading(true);
+      try {
+        const opts = await getTransactionFormOptions();
+        setLoadedProducts(opts.products);
+        setLoadedCustomers(opts.customers);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
 
   // Prefill the date with "now" on the client only (avoids hydration mismatch).
   useEffect(() => {
@@ -85,7 +111,7 @@ export default function AddTransactionForm({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
       >
         + Add transaction
@@ -112,10 +138,11 @@ export default function AddTransactionForm({
             name="customerId"
             required
             defaultValue=""
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm bg-white"
+            disabled={loading}
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm bg-white disabled:bg-slate-100"
           >
             <option value="" disabled>
-              Choose a customer…
+              {loading ? "Loading customers…" : "Choose a customer…"}
             </option>
             {(customers ?? []).map((c) => (
               <option key={c.id} value={c.id}>
