@@ -64,6 +64,9 @@ export function normalizePhone(raw: string | null | undefined): string | null {
  */
 export function formatPhoneDisplay(canonical: string | null | undefined): string {
   if (!canonical) return "—";
+  // Placeholder key for a WhatsApp contact whose number we couldn't recover
+  // (saved contact — WhatsApp omits the number from exports). See lib/whatsapp.
+  if (canonical.startsWith("wa:")) return "No number yet";
   // Non-Malaysian numbers: show as "+<digits>" (we don't carry per-country
   // grouping rules, so a clean E.164-style "+" prefix is the safe display).
   if (!canonical.startsWith("60")) return `+${canonical}`;
@@ -83,7 +86,7 @@ export function formatPhoneDisplay(canonical: string | null | undefined): string
  * wa.me requires digits only, no "+".
  */
 export function whatsappLink(canonical: string | null | undefined, text?: string): string | null {
-  if (!canonical) return null;
+  if (!canonical || canonical.startsWith("wa:")) return null; // placeholder — no real number
   const base = `https://wa.me/${canonical}`;
   return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
