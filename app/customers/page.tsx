@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { STORE_LABELS, SOURCE_LABELS } from "@/lib/constants";
 import Pagination from "@/app/components/Pagination";
+import SyncMembersButton from "./SyncMembersButton";
 
 export const dynamic = "force-dynamic";
 
@@ -65,12 +66,15 @@ export default async function CustomersPage({
             {totalCount.toLocaleString()} {totalCount === 1 ? "result" : "results"}
           </p>
         </div>
-        <Link
-          href="/customers/new"
-          className="bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
-        >
-          + New customer
-        </Link>
+        <div className="flex items-start gap-2">
+          <SyncMembersButton />
+          <Link
+            href="/customers/new"
+            className="bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
+          >
+            + New customer
+          </Link>
+        </div>
       </div>
 
       {/* Filter bar */}

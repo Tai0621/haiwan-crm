@@ -12,7 +12,6 @@ export async function runStoreHubTransactionSync(
   days = 7,
 ): Promise<StoreHubTransactionSyncSummary> {
   const summary = await syncStoreHubTransactions(days);
-  revalidatePath("/storehub");
   revalidatePath("/transactions");
   revalidatePath("/customers");
   revalidatePath("/");
@@ -22,7 +21,6 @@ export async function runStoreHubTransactionSync(
 
 export async function runStoreHubCustomerSync(): Promise<StoreHubCustomerSyncSummary> {
   const summary = await syncStoreHubCustomers();
-  revalidatePath("/storehub");
   revalidatePath("/customers");
   return summary;
 }

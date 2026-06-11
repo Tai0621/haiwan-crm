@@ -52,9 +52,6 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
   chevronLeft: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
   ),
-  storehub: ({ className = ic }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><path d="M2 7h20" /><path d="M12 22V7" /></svg>
-  ),
 };
 
 const LINKS: Array<{ href: string; label: string; icon: keyof typeof Icons }> = [
@@ -67,7 +64,6 @@ const LINKS: Array<{ href: string; label: string; icon: keyof typeof Icons }> = 
   { href: "/revenue", label: "Revenue mix", icon: "revenue" },
   { href: "/subscriptions", label: "Subscriptions", icon: "subscriptions" },
   { href: "/whatsapp", label: "WhatsApp", icon: "whatsapp" },
-  { href: "/storehub", label: "StoreHub", icon: "storehub" },
   { href: "/import", label: "Import", icon: "import" },
   { href: "/export", label: "Export", icon: "export" },
 ];

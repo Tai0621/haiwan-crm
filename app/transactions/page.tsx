@@ -12,14 +12,22 @@ export default async function TransactionsPage() {
   // Only the recent list is needed to render the page. The product catalogue and
   // customer list for the "Add transaction" form are loaded on demand when the
   // form is opened (see AddTransactionForm lazy mode) so this page stays fast.
-  const transactions = await prisma.transaction.findMany({
-    orderBy: { transactionDate: "desc" },
-    take: 100,
-    include: {
-      customer: { select: { id: true, name: true, phone: true } },
-      _count: { select: { lines: true } },
-    },
-  });
+  const [transactions, importedCount, lastSale] = await Promise.all([
+    prisma.transaction.findMany({
+      orderBy: { transactionDate: "desc" },
+      take: 100,
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        _count: { select: { lines: true } },
+      },
+    }),
+    prisma.transaction.count({ where: { storehubRef: { not: null } } }),
+    prisma.transaction.findFirst({
+      where: { storehubRef: { not: null } },
+      orderBy: { transactionDate: "desc" },
+      select: { transactionDate: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -34,11 +42,13 @@ export default async function TransactionsPage() {
         </p>
       </div>
 
+      <StoreHubSyncShortcut
+        latestSale={lastSale?.transactionDate ? fmtDateTime(lastSale.transactionDate) : null}
+        importedCount={importedCount}
+      />
+
       <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <AddTransactionForm lazy returnTo="/transactions" />
-          <StoreHubSyncShortcut />
-        </div>
+        <AddTransactionForm lazy returnTo="/transactions" />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-6">
