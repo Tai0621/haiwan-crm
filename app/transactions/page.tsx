@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { rm, fmtDateTime } from "@/lib/format";
 import { STORE_LABELS } from "@/lib/constants";
 import AddTransactionForm from "./AddTransactionForm";
+import StoreHubSyncShortcut from "./StoreHubSyncShortcut";
 import { deleteTransaction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,10 @@ export default async function TransactionsPage() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <AddTransactionForm lazy returnTo="/transactions" />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <AddTransactionForm lazy returnTo="/transactions" />
+          <StoreHubSyncShortcut />
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-6">
