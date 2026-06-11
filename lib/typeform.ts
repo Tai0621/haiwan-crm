@@ -13,6 +13,7 @@
 
 import { prisma } from "./db";
 import { normalizePhone } from "./phone";
+import { findExistingCustomer, buildEnrichment } from "./customer-resolve";
 
 interface TFField {
   ref?: string;
@@ -181,25 +182,25 @@ export async function ingestTypeformSubmission(
   parsed: ParsedSubmission,
 ): Promise<{ customerId: string; created: boolean; petsCreated: number }> {
   const phone = parsed.phone ? normalizePhone(parsed.phone) : null;
-  const key = phone ?? `tf:${parsed.token || Math.random().toString(36).slice(2)}`;
 
-  let customer = await prisma.customer.findUnique({ where: { phone: key } });
+  // Match an existing customer by phone, then email — so a person already in the
+  // CRM (e.g. created from a StoreHub sale earlier) is enriched, not duplicated.
+  let customer = await findExistingCustomer({ phone, email: parsed.email });
   let created = false;
   if (customer) {
-    const data: {
-      name?: string; email?: string; preferredStore?: "KL" | "PJ" | "NONE";
-      marketingConsent?: boolean; consentDate?: Date;
-    } = {};
-    if (!customer.name && parsed.name) data.name = parsed.name;
-    if (!customer.email && parsed.email) data.email = parsed.email;
-    if (customer.preferredStore === "NONE" && parsed.preferredStore !== "NONE")
-      data.preferredStore = parsed.preferredStore;
-    if (parsed.marketingConsent && !customer.marketingConsent) {
-      data.marketingConsent = true;
-      data.consentDate = new Date();
-    }
+    const data = buildEnrichment(
+      customer,
+      {
+        name: parsed.name,
+        email: parsed.email,
+        preferredStore: parsed.preferredStore,
+        marketingConsent: parsed.marketingConsent,
+      },
+      phone,
+    );
     if (Object.keys(data).length) customer = await prisma.customer.update({ where: { id: customer.id }, data });
   } else {
+    const key = phone ?? `tf:${parsed.token || Math.random().toString(36).slice(2)}`;
     customer = await prisma.customer.create({
       data: {
         phone: key,

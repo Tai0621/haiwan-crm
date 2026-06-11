@@ -22,6 +22,7 @@
 import { prisma } from "./db";
 import { normalizePhone } from "./phone";
 import { buildProductIndex, matchProduct } from "./match";
+import { findExistingCustomer, buildEnrichment } from "./customer-resolve";
 
 const SH_BASE = "https://api.storehubhq.com";
 
@@ -122,10 +123,11 @@ export async function syncStoreHubCustomers(): Promise<StoreHubCustomerSyncSumma
         continue;
       }
       const name = fullName(m);
-      const existing = await prisma.customer.findUnique({ where: { phone } });
+      const existing = await findExistingCustomer({ phone });
       if (existing) {
-        if (!existing.name && name) {
-          await prisma.customer.update({ where: { id: existing.id }, data: { name } });
+        const data = buildEnrichment(existing, { name }, phone);
+        if (Object.keys(data).length) {
+          await prisma.customer.update({ where: { id: existing.id }, data });
           updated++;
         }
       } else {
@@ -237,7 +239,7 @@ export async function syncStoreHubTransactions(
         if (cached) {
           customerId = cached;
         } else {
-          let cust = await prisma.customer.findUnique({ where: { phone: memberPhone } });
+          let cust = await findExistingCustomer({ phone: memberPhone });
           if (!cust) {
             cust = await prisma.customer.create({
               data: {
