@@ -46,7 +46,7 @@ export default async function DashboardPage() {
           <p className="text-sm text-slate-400">Nothing due soon.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[44rem] text-sm">
               <thead className="bg-slate-50 text-slate-500 text-left text-xs">
                 <tr>
                   <th className="px-3 py-2 font-medium">Customer</th>

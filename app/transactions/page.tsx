@@ -59,7 +59,8 @@ export default async function TransactionsPage() {
         {transactions.length === 0 ? (
           <p className="text-sm text-slate-400">No transactions yet.</p>
         ) : (
-          <table className="w-full text-sm">
+         <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-sm">
             <thead className="text-slate-400 text-left text-xs border-b border-slate-100">
               <tr>
                 <th className="py-2 font-medium">Date</th>
@@ -110,6 +111,7 @@ export default async function TransactionsPage() {
               ))}
             </tbody>
           </table>
+         </div>
         )}
       </div>
     </div>

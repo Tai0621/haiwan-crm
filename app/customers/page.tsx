@@ -59,18 +59,18 @@ export default async function CustomersPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Customers</h1>
           <p className="text-sm text-slate-500">
             {totalCount.toLocaleString()} {totalCount === 1 ? "result" : "results"}
           </p>
         </div>
-        <div className="flex items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <SyncMembersButton />
           <Link
             href="/customers/new"
-            className="bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
+            className="bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700 whitespace-nowrap"
           >
             + New customer
           </Link>
@@ -116,8 +116,9 @@ export default async function CustomersPage({
       </form>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-slate-200 rounded-lg">
+       <div className="overflow-x-auto">
+        <table className="w-full min-w-[40rem] text-sm">
           <thead className="bg-slate-50 text-slate-500 text-left">
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>
@@ -174,6 +175,7 @@ export default async function CustomersPage({
             )}
           </tbody>
         </table>
+       </div>
         <Pagination
           basePath="/customers"
           params={{ q, store, needs }}

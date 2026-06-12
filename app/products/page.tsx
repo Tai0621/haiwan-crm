@@ -136,8 +136,9 @@ export default async function ProductsPage({
         </Link>
       </form>
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-slate-200 rounded-lg">
+       <div className="overflow-x-auto">
+        <table className="w-full min-w-[64rem] text-sm">
           <thead className="bg-slate-50 text-slate-500 text-left text-xs">
             <tr>
               <th className="px-4 py-2 font-medium">SKU</th>
@@ -238,6 +239,7 @@ export default async function ProductsPage({
             )}
           </tbody>
         </table>
+       </div>
         <Pagination
           basePath="/products"
           params={{ q, supplier, consumable }}
