@@ -26,28 +26,32 @@ export default async function CustomerDetailPage({
 }) {
   const { id } = await params;
 
-  const customer = await prisma.customer.findUnique({
-    where: { id },
-    include: {
-      pets: true,
-      transactions: {
-        orderBy: { transactionDate: "desc" },
-        include: {
-          lines: {
-            include: {
-              product: { select: { name: true, supplierType: true } },
-              pet: { select: { name: true } },
+  // These three reads are independent — run them in parallel so the page waits
+  // on one round trip to the DB, not three back-to-back.
+  const [customer, predictions, mix] = await Promise.all([
+    prisma.customer.findUnique({
+      where: { id },
+      include: {
+        pets: true,
+        transactions: {
+          orderBy: { transactionDate: "desc" },
+          include: {
+            lines: {
+              include: {
+                product: { select: { name: true, supplierType: true } },
+                pet: { select: { name: true } },
+              },
             },
           },
         },
       },
-    },
-  });
+    }),
+    predictionsForCustomer(id),
+    marginMixForCustomer(id),
+  ]);
 
   if (!customer) notFound();
 
-  const predictions = await predictionsForCustomer(id);
-  const mix = await marginMixForCustomer(id);
   const wa = whatsappLink(customer.phone);
 
 
