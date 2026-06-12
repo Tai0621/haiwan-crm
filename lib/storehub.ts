@@ -75,14 +75,21 @@ export function storeHubConfigured(): boolean {
 
 async function shGet<T>(path: string, cfg: { user: string; pass: string }): Promise<T> {
   const auth = "Basic " + Buffer.from(`${cfg.user}:${cfg.pass}`).toString("base64");
-  const res = await fetch(SH_BASE + path, {
-    headers: { Authorization: auth, Accept: "application/json" },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`StoreHub ${path} → ${res.status} ${res.statusText} ${body.slice(0, 160)}`);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000); // never hang a page render
+  try {
+    const res = await fetch(SH_BASE + path, {
+      headers: { Authorization: auth, Accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`StoreHub ${path} → ${res.status} ${res.statusText} ${body.slice(0, 160)}`);
+    }
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 const fullName = (c: SHCustomer): string | null =>
@@ -288,5 +295,33 @@ export async function syncStoreHubTransactions(
     return { ok: true, ...summary };
   } catch (e) {
     return { ok: false, error: (e as Error).message, ...base };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// On-demand freshness: pull the latest StoreHub sales into the CRM when a page
+// that shows live figures (e.g. Revenue mix) is opened, so the numbers reflect
+// today's takings without anyone clicking "sync".
+//
+// Throttled per server instance so rapid reloads don't hammer the API, and
+// fully fail-safe — if StoreHub is unconfigured/slow/down it just returns and
+// the page renders whatever is already imported. Never throws.
+// ---------------------------------------------------------------------------
+let lastAutoSyncAt = 0;
+const AUTO_SYNC_MIN_INTERVAL_MS = 5 * 60 * 1000; // at most once / 5 min per instance
+
+export async function refreshRecentTransactions(opts?: {
+  days?: number;
+  force?: boolean;
+}): Promise<boolean> {
+  if (!storeHubConfigured()) return false;
+  const now = Date.now();
+  if (!opts?.force && now - lastAutoSyncAt < AUTO_SYNC_MIN_INTERVAL_MS) return false;
+  lastAutoSyncAt = now;
+  try {
+    const r = await syncStoreHubTransactions(opts?.days ?? 2);
+    return r.ok;
+  } catch {
+    return false;
   }
 }

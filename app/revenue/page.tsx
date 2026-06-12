@@ -1,12 +1,17 @@
 import { monthlyRevenueMix, pct } from "@/lib/analytics";
 import { SUPPLIER_COLORS } from "@/lib/constants";
 import { rm } from "@/lib/format";
+import { refreshRecentTransactions, storeHubConfigured } from "@/lib/storehub";
 import RevenueChart from "./RevenueChartClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function RevenuePage() {
+  // Pull the latest StoreHub sales first (throttled + fail-safe) so the mix
+  // reflects today's takings automatically, then compute from the CRM data.
+  await refreshRecentTransactions();
   const data = await monthlyRevenueMix();
+  const live = storeHubConfigured();
 
   // Totals across all months
   const totals = data.reduce(
@@ -24,7 +29,15 @@ export default async function RevenuePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Revenue mix</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Revenue mix</h1>
+          {live && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              Live from StoreHub
+            </span>
+          )}
+        </div>
         <p className="text-sm text-slate-500">
           The north-star chart: monthly revenue split by supplier type. The strategy is working
           when the <span style={{ color: SUPPLIER_COLORS.INHOUSE }} className="font-medium">green
