@@ -549,8 +549,45 @@ async function main() {
     },
   });
 
+  // -------------------------------------------------------------------------
+  // Action Inbox tasks (Phase 1) — a spread of types so the inbox is populated.
+  // -------------------------------------------------------------------------
+  function hoursFromNow(h: number): Date {
+    return new Date(Date.now() + h * 60 * 60 * 1000);
+  }
+
+  await prisma.task.createMany({
+    data: [
+      // A fresh lead captured at the counter (SOP §5), due in ~20h.
+      {
+        type: "LEAD_FOLLOWUP", source: "SOP_LEAD", channel: "WALKIN", store: "KL",
+        customerId: c6.id, holdItem: "Persian kitten starter kit",
+        note: "First-time owner, asked about litter training", dueAt: hoursFromNow(20),
+      },
+      // An active 24h hold (SOP §6) with ~6h left on the clock.
+      {
+        type: "HOLD", source: "SOP_HOLD", channel: "WALKIN", store: "PJ",
+        customerId: c2.id, holdItem: "Royal Canin Maxi Adult 15kg",
+        holdExpiresAt: hoursFromNow(6), dueAt: hoursFromNow(6),
+      },
+      // A hold that has ALREADY lapsed — the dashboard sweep will flip this to
+      // EXPIRED on first load and spawn a courtesy follow-up, demonstrating the
+      // close-the-loop behaviour.
+      {
+        type: "HOLD", source: "SOP_HOLD", channel: "WALKIN", store: "KL",
+        customerId: c10.id, holdItem: "Feliway Scratching Post",
+        holdExpiresAt: hoursFromNow(-2), dueAt: hoursFromNow(-2),
+      },
+      // An inbound WhatsApp inquiry awaiting a first reply.
+      {
+        type: "INQUIRY", source: "MANUAL", channel: "WHATSAPP", store: "NONE",
+        customerId: c3.id, note: "Asked if we stock grain-free kitten food", dueAt: hoursFromNow(18),
+      },
+    ],
+  });
+
   console.log("✓ Seed complete.");
-  console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5`);
+  console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4`);
 }
 
 main()

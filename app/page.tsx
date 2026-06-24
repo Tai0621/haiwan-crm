@@ -1,110 +1,115 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { dueSoonPredictions } from "@/lib/refill";
-import { formatPhoneDisplay, whatsappLink } from "@/lib/phone";
-import { fmtDate } from "@/lib/format";
-import { REFILL_WINDOW_DAYS } from "@/lib/constants";
+import { getInbox, sweepExpiredHolds, type InboxItem } from "@/lib/tasks";
+import InboxRow from "@/app/components/InboxRow";
+import QuickAdd from "@/app/components/QuickAdd";
+import type { Store, TaskType } from "@/app/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const [totalCustomers, needsDetails, activeSubs, due] = await Promise.all([
+const TYPE_LABELS: Record<string, string> = {
+  REFILL: "Refill",
+  LEAD_FOLLOWUP: "Lead",
+  INQUIRY: "Inquiry",
+  HOLD: "Hold",
+  ACTIVATION: "Activation",
+  WINBACK: "Win-back",
+  SUBSCRIPTION_DUE: "Subscription",
+  BRAND_REVIEW: "Brand review",
+  CUSTOM: "Task",
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ store?: string; type?: string }>;
+}) {
+  const sp = await searchParams;
+  const storeFilter = (sp.store as Store | "ALL") || "ALL";
+  const typeFilter = (sp.type as TaskType | "ALL") || "ALL";
+
+  // Flip any lapsed 24h holds to EXPIRED + spawn courtesy follow-ups before we
+  // read the inbox, so the list reflects the latest state on every load.
+  await sweepExpiredHolds();
+
+  const [all, totalCustomers, needsDetails, activeSubs] = await Promise.all([
+    getInbox(), // unfiltered — drives counts + the available filter pills
     prisma.customer.count(),
     prisma.customer.count({ where: { needsDetails: true } }),
     prisma.subscription.count({ where: { status: "ACTIVE" } }),
-    dueSoonPredictions(),
   ]);
 
-  const waMessage = (name: string | null, product: string, pets: string[]) => {
-    const who = pets.length ? `${pets.join(" & ")}'s` : "your pet's";
-    return `Hi${name ? " " + name : ""}! This is Haiwan. We think ${who} ${product} may be running low soon — would you like us to set aside a refill?`;
+  const overdue = all.filter((i) => i.isOverdue).length;
+  const presentTypes = Array.from(new Set(all.map((i) => i.type)));
+
+  const items = all.filter(
+    (i) =>
+      (storeFilter === "ALL" || i.store === storeFilter) &&
+      (typeFilter === "ALL" || i.type === typeFilter),
+  );
+
+  const qs = (next: { store?: string; type?: string }) => {
+    const p = new URLSearchParams();
+    const store = next.store ?? (storeFilter !== "ALL" ? storeFilter : "");
+    const type = next.type ?? (typeFilter !== "ALL" ? typeFilter : "");
+    if (store && store !== "ALL") p.set("store", store);
+    if (type && type !== "ALL") p.set("type", type);
+    const s = p.toString();
+    return s ? `/?${s}` : "/";
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Haiwan — another parent to every pet.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Action Inbox</h1>
+        <p className="text-sm text-slate-500">What to do now — Haiwan, another parent to every pet.</p>
       </div>
 
       {/* Headline counts */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total customers" value={totalCustomers} href="/customers" />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard label="To action now" value={all.length} accent={all.length ? undefined : "muted"} />
+        <StatCard label="Overdue" value={overdue} accent={overdue ? "red" : "muted"} />
         <StatCard label="Needs details" value={needsDetails} href="/customers?needs=1" accent="amber" />
-        <StatCard label="Due to contact" value={due.length} accent="red" />
         <StatCard label="Active subscriptions" value={activeSubs} href="/subscriptions" />
       </div>
 
-      {/* To contact this week */}
-      <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-1">To contact this week</h2>
-        <p className="text-xs text-slate-400 mb-4">
-          Consumables predicted to run out within {REFILL_WINDOW_DAYS} days · soonest first
-        </p>
+      <QuickAdd />
 
-        {due.length === 0 ? (
-          <p className="text-sm text-slate-400">Nothing due soon.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-left text-xs">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Customer</th>
-                  <th className="px-3 py-2 font-medium">Pet(s)</th>
-                  <th className="px-3 py-2 font-medium">Product</th>
-                  <th className="px-3 py-2 font-medium">Last bought</th>
-                  <th className="px-3 py-2 font-medium">Predicted due</th>
-                  <th className="px-3 py-2 font-medium text-right">Days</th>
-                  <th className="px-3 py-2 font-medium text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {due.map((d) => {
-                  const wa = whatsappLink(d.customerPhone, waMessage(d.customerName, d.productName, d.petNames));
-                  return (
-                    <tr key={`${d.customerId}-${d.productId}`} className="hover:bg-slate-50">
-                      <td className="px-3 py-2">
-                        <Link href={`/customers/${d.customerId}`} className="font-medium text-slate-900 hover:underline">
-                          {d.customerName ?? "Unnamed"}
-                        </Link>
-                        <div className="text-xs text-slate-400 font-mono">
-                          {formatPhoneDisplay(d.customerPhone)}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-slate-600">{d.petNames.join(", ") || "—"}</td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {d.productName}
-                        {d.basis === "category-default" && (
-                          <span className="ml-1 text-[10px] text-slate-400">(est.)</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-slate-500">{fmtDate(d.lastPurchaseDate)}</td>
-                      <td className="px-3 py-2 text-slate-700">{fmtDate(d.predictedNextDate)}</td>
-                      <td
-                        className={`px-3 py-2 text-right font-medium ${
-                          d.daysUntilDue < 0 ? "text-red-600" : d.daysUntilDue <= 2 ? "text-orange-600" : "text-slate-600"
-                        }`}
-                      >
-                        {d.daysUntilDue < 0 ? `${Math.abs(d.daysUntilDue)}d overdue` : `${d.daysUntilDue}d`}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {wa && (
-                          <a
-                            href={wa}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block bg-green-600 text-white px-2.5 py-1 rounded text-xs font-medium hover:bg-green-700"
-                          >
-                            WhatsApp
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* Inbox */}
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">To action now</h2>
+            <p className="text-xs text-slate-400">
+              {items.length} of {all.length} item{all.length === 1 ? "" : "s"} · soonest due first
+            </p>
           </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <FilterPill href={qs({ store: "ALL" })} active={storeFilter === "ALL"} label="All stores" />
+            <FilterPill href={qs({ store: "KL" })} active={storeFilter === "KL"} label="KL" />
+            <FilterPill href={qs({ store: "PJ" })} active={storeFilter === "PJ"} label="PJ" />
+          </div>
+        </div>
+
+        {presentTypes.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-4 py-2 text-xs">
+            <FilterPill href={qs({ type: "ALL" })} active={typeFilter === "ALL"} label="All types" />
+            {presentTypes.map((t) => (
+              <FilterPill key={t} href={qs({ type: t })} active={typeFilter === t} label={TYPE_LABELS[t] ?? t} />
+            ))}
+          </div>
+        )}
+
+        {items.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-slate-400">
+            {all.length === 0 ? "Nothing to action — you're all caught up. 🐾" : "No items match this filter."}
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {items.map((item: InboxItem) => (
+              <InboxRow key={item.key} item={item} />
+            ))}
+          </ul>
         )}
       </div>
     </div>
@@ -120,15 +125,34 @@ function StatCard({
   label: string;
   value: number;
   href?: string;
-  accent?: "amber" | "red";
+  accent?: "amber" | "red" | "muted";
 }) {
   const color =
-    accent === "amber" ? "text-amber-600" : accent === "red" ? "text-red-600" : "text-slate-900";
+    accent === "amber"
+      ? "text-amber-600"
+      : accent === "red"
+        ? "text-red-600"
+        : accent === "muted"
+          ? "text-slate-400"
+          : "text-slate-900";
   const inner = (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
       <div className={`text-3xl font-bold ${color}`}>{value}</div>
-      <div className="text-sm text-slate-500 mt-1">{label}</div>
+      <div className="mt-1 text-sm text-slate-500">{label}</div>
     </div>
   );
   return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+function FilterPill({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-full px-2.5 py-1 font-medium transition-colors ${
+        active ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+      }`}
+    >
+      {label}
+    </Link>
+  );
 }

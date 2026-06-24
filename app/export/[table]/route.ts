@@ -115,6 +115,40 @@ async function buildRows(table: string): Promise<Rows | null> {
         updatedAt: iso(s.updatedAt),
       }));
     }
+    case "tasks": {
+      const rows = await prisma.task.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((t) => ({
+        id: t.id,
+        type: t.type,
+        source: t.source,
+        channel: t.channel,
+        store: t.store,
+        customerId: t.customerId,
+        petId: t.petId,
+        productId: t.productId,
+        dueAt: iso(t.dueAt),
+        status: t.status,
+        note: t.note,
+        holdItem: t.holdItem,
+        holdExpiresAt: iso(t.holdExpiresAt),
+        snoozedUntil: iso(t.snoozedUntil),
+        createdAt: iso(t.createdAt),
+        completedAt: iso(t.completedAt),
+      }));
+    }
+    case "refilloverlays": {
+      const rows = await prisma.refillOverlay.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((o) => ({
+        id: o.id,
+        customerId: o.customerId,
+        productId: o.productId,
+        cycleDate: iso(o.cycleDate),
+        status: o.status,
+        snoozedUntil: iso(o.snoozedUntil),
+        createdAt: iso(o.createdAt),
+        updatedAt: iso(o.updatedAt),
+      }));
+    }
     default:
       return null;
   }

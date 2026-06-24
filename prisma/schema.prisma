@@ -144,6 +144,48 @@ enum LeadStatus {
   DISMISSED  // not actionable / false positive
 }
 
+// --- Action Inbox (Phase 1) ---------------------------------------------------
+
+// What kind of work a Task represents. Drives its WhatsApp template + icon.
+enum TaskType {
+  REFILL            // a consumable predicted to run low (usually surfaced via the
+                    // refill engine + RefillOverlay, but CUSTOM/manual REFILLs allowed)
+  LEAD_FOLLOWUP     // a walk-in/asked-about-an-item lead to chase (SOP §5)
+  INQUIRY           // an inbound question from WhatsApp/website/Instagram
+  HOLD              // a 24h item hold to convert before it lapses (SOP §6)
+  ACTIVATION        // nudge a PROSPECT to claim membership (Phase 2)
+  WINBACK           // re-engage a lapsed customer (Phase 2)
+  SUBSCRIPTION_DUE  // a managed subscription due for its next cycle (Phase 3)
+  BRAND_REVIEW      // a brand 90-day trial review (Phase 4)
+  CUSTOM            // anything staff types in manually
+}
+
+// Where the task originated — shown as a channel tag in the inbox.
+enum TaskChannel {
+  WALKIN
+  WHATSAPP
+  WEBSITE
+  INSTAGRAM
+  SYSTEM
+}
+
+// Lifecycle of a task in the inbox.
+enum TaskStatus {
+  OPEN
+  DONE
+  SNOOZED
+  EXPIRED
+}
+
+// Which mechanism created the task (for auditing + export).
+enum TaskSource {
+  REFILL_ENGINE
+  SOP_LEAD
+  SOP_HOLD
+  SYSTEM
+  MANUAL
+}
+
 // ---------------------------------------------------------------------------
 // Customer — the human contact and payer.
 // Phone is the identity key: unique, normalised to "60xxxxxxxxx" format.
@@ -177,6 +219,8 @@ model Customer {
   subscriptions    Subscription[]
   whatsappMessages WhatsAppMessage[]
   whatsappLeads    WhatsAppLead[]
+  tasks            Task[]
+  refillOverlays   RefillOverlay[]
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +266,7 @@ model Pet {
 
   transactionLines TransactionLine[]
   subscriptions    Subscription[]
+  tasks            Task[]
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +310,8 @@ model Product {
 
   lines         TransactionLine[]
   subscriptions Subscription[]
+  tasks         Task[]
+  refillOverlays RefillOverlay[]
 }
 
 // ---------------------------------------------------------------------------
@@ -408,5 +455,82 @@ model WhatsAppLead {
 
   @@index([status])
   @@index([analysisDate])
+  @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Task — the Action Inbox spine (Phase 1).
+//
+// A single, dueAt-sorted list of "what to do now" that staff work from. Tasks
+// are created manually (SOP lead capture / 24h hold / inquiry intake) or spawned
+// by the system (hold-lapse follow-ups; later phases add activation, win-back,
+// subscription-due, brand-review). Refill predictions are NOT stored here — they
+// stay computed on the fly in lib/refill.ts and carry their done/snooze state in
+// RefillOverlay; the inbox merges the two at read time.
+//
+// All FKs are nullable + onDelete SetNull so deleting a customer/pet/product
+// never destroys the audit trail of work that was done.
+// ---------------------------------------------------------------------------
+model Task {
+  id         String      @id @default(cuid())
+  type       TaskType
+  source     TaskSource  @default(MANUAL)
+  channel    TaskChannel @default(SYSTEM)
+  // Which store this task belongs to (reuses the shared Store enum). Defaults to
+  // the customer's preferredStore, or NONE when unknown.
+  store      Store       @default(NONE)
+
+  customerId String?
+  customer   Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  petId      String?
+  pet        Pet?        @relation(fields: [petId], references: [id], onDelete: SetNull)
+  productId  String?
+  product    Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // When this task is due / its first-reply deadline. Drives inbox ordering.
+  dueAt      DateTime
+  status     TaskStatus  @default(OPEN)
+  note       String?
+
+  // HOLD-only: the item being held and when the 24h reservation lapses.
+  holdItem      String?
+  holdExpiresAt DateTime?
+
+  // SNOOZED-only: hidden from the open inbox until this moment passes.
+  snoozedUntil  DateTime?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status, dueAt])
+  @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// RefillOverlay — done/snooze state for a computed refill prediction (Phase 1).
+//
+// Refills are predicted live (never stored), so to let staff clear one without
+// it reappearing we store ONLY the overlay state here, keyed by (customer,
+// product). `cycleDate` records the predictedNextDate the action was taken
+// against: when the customer buys again the live prediction moves to a new
+// cycleDate, the overlay no longer matches, and the refill correctly reappears.
+// ---------------------------------------------------------------------------
+model RefillOverlay {
+  id         String     @id @default(cuid())
+  customerId String
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // The predicted-next-purchase date this overlay applies to (the "cycle key").
+  cycleDate    DateTime
+  // DONE = cleared for this cycle; SNOOZED = hidden until snoozedUntil.
+  status       TaskStatus @default(DONE)
+  snoozedUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([customerId, productId])
   @@index([customerId])
 }

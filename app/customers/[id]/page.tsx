@@ -6,6 +6,8 @@ import PetManager from "./PetManager";
 import LinkTransactionForm from "@/app/transactions/LinkTransactionForm";
 import { unlinkTransaction } from "@/app/transactions/actions";
 import { predictionsForCustomer } from "@/lib/refill";
+import { inboxForCustomer } from "@/lib/tasks";
+import InboxRow from "@/app/components/InboxRow";
 import { marginMixForCustomer, pct } from "@/lib/analytics";
 import { formatPhoneDisplay, whatsappLink } from "@/lib/phone";
 import { fmtDate, fmtDateTime, rm } from "@/lib/format";
@@ -28,7 +30,7 @@ export default async function CustomerDetailPage({
 
   // These three reads are independent — run them in parallel so the page waits
   // on one round trip to the DB, not three back-to-back.
-  const [customer, predictions, mix] = await Promise.all([
+  const [customer, predictions, mix, actions] = await Promise.all([
     prisma.customer.findUnique({
       where: { id },
       include: {
@@ -48,6 +50,7 @@ export default async function CustomerDetailPage({
     }),
     predictionsForCustomer(id),
     marginMixForCustomer(id),
+    inboxForCustomer(id),
   ]);
 
   if (!customer) notFound();
@@ -130,6 +133,31 @@ export default async function CustomerDetailPage({
           </div>
         )}
       </div>
+
+      {/* Action needed — this customer's open inbox items (only shown if any) */}
+      {actions.length > 0 && (
+        <div className="bg-white border border-amber-200 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-amber-100 bg-amber-50">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                Action needed
+                <span className="text-xs font-medium bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
+                  {actions.length}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500">Open inbox items for this customer · soonest first</p>
+            </div>
+            <Link href="/" className="text-xs text-slate-500 hover:underline whitespace-nowrap">
+              Open inbox →
+            </Link>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {actions.map((item) => (
+              <InboxRow key={item.key} item={item} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Pets */}
       <div className="bg-white border border-slate-200 rounded-lg p-6">

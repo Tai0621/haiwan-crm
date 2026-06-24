@@ -21,3 +21,16 @@ export async function expectedToken(): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+/**
+ * True when the current request carries a valid session cookie. The proxy gates
+ * page navigations, but Server Actions are reachable by direct POST, so action
+ * handlers call this to re-verify before mutating.
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  const { cookies } = await import("next/headers");
+  const store = await cookies();
+  const token = store.get(AUTH_COOKIE)?.value;
+  if (!token) return false;
+  return token === (await expectedToken());
+}

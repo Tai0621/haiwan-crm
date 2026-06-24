@@ -61,7 +61,7 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
 };
 
 const LINKS: Array<{ href: string; label: string; icon: keyof typeof Icons }> = [
-  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/", label: "Inbox", icon: "dashboard" },
   { href: "/pets", label: "Pets", icon: "pets" },
   { href: "/customers", label: "Customers", icon: "customers" },
   { href: "/transactions", label: "Transactions", icon: "transactions" },
