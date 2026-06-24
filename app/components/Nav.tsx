@@ -22,6 +22,9 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
   customers: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
   ),
+  members: ({ className = ic }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="8" cy="12" r="2" /><path d="M13 10h5" /><path d="M13 14h3" /><path d="M5.5 16a2.5 2.5 0 0 1 5 0" /></svg>
+  ),
   transactions: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2v6h6" /><path d="M4 6V4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2" /><path d="M2 13h10" /><path d="m9 16 3-3-3-3" /></svg>
   ),
@@ -64,6 +67,7 @@ const LINKS: Array<{ href: string; label: string; icon: keyof typeof Icons }> = 
   { href: "/", label: "Inbox", icon: "dashboard" },
   { href: "/pets", label: "Pets", icon: "pets" },
   { href: "/customers", label: "Customers", icon: "customers" },
+  { href: "/members", label: "Members", icon: "members" },
   { href: "/transactions", label: "Transactions", icon: "transactions" },
   { href: "/products", label: "Products", icon: "products" },
   { href: "/analysis", label: "Analysis", icon: "analysis" },

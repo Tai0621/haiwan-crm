@@ -314,10 +314,10 @@ async function main() {
     return prisma.pet.create({ data });
   }
 
-  const c1 = await makeCustomer({ phone: "60123456789", name: "Aishah Razak", email: "aishah@gmail.com", preferredStore: "KL", marketingConsent: true, consentDate: daysAgo(120), source: "WALKIN", needsDetails: false });
-  const c2 = await makeCustomer({ phone: "60112223344", name: "Brandon Lim", email: "brandon.lim@hotmail.com", preferredStore: "PJ", marketingConsent: true, consentDate: daysAgo(90), source: "STOREHUB", needsDetails: false });
+  const c1 = await makeCustomer({ phone: "60123456789", name: "Aishah Razak", email: "aishah@gmail.com", preferredStore: "KL", marketingConsent: true, consentDate: daysAgo(120), source: "WALKIN", needsDetails: false, posSpent: 4200, posTransactions: 38, posLastPurchase: daysAgo(40) });
+  const c2 = await makeCustomer({ phone: "60112223344", name: "Brandon Lim", email: "brandon.lim@hotmail.com", preferredStore: "PJ", marketingConsent: true, consentDate: daysAgo(90), source: "STOREHUB", needsDetails: false, posSpent: 1800, posTransactions: 16, posLastPurchase: daysAgo(30) });
   const c3 = await makeCustomer({ phone: "60198765432", name: "Chong Wei Ling", email: null, preferredStore: "KL", marketingConsent: false, source: "WHATSAPP", needsDetails: false });
-  const c4 = await makeCustomer({ phone: "60134445566", name: "Devi Nair", email: "devinair@gmail.com", preferredStore: "PJ", marketingConsent: true, consentDate: daysAgo(60), source: "WALKIN", needsDetails: false });
+  const c4 = await makeCustomer({ phone: "60134445566", name: "Devi Nair", email: "devinair@gmail.com", preferredStore: "PJ", marketingConsent: true, consentDate: daysAgo(60), source: "WALKIN", needsDetails: false, posSpent: 1500, posTransactions: 14, posLastPurchase: daysAgo(20) });
   const c5 = await makeCustomer({ phone: "60167778899", name: "Eugene Tan", email: null, preferredStore: "KL", marketingConsent: false, source: "STOREHUB", needsDetails: false });
   const c6 = await makeCustomer({ phone: "60145556677", name: "Farah Ibrahim", email: "farah.i@yahoo.com", preferredStore: "KL", marketingConsent: true, consentDate: daysAgo(30), source: "WALKIN", needsDetails: false });
   const c7 = await makeCustomer({ phone: "60178889900", name: "Gary Ong", email: null, preferredStore: "PJ", marketingConsent: false, source: "STOREHUB", needsDetails: false });
@@ -586,8 +586,38 @@ async function main() {
     ],
   });
 
+  // -------------------------------------------------------------------------
+  // Membership backfill (Phase 2) — customers with consent + >=1 pet are treated
+  // as already-claimed (ACTIVE) and assigned an HW-##### memberId. Lapse status
+  // is then reconciled on the dashboard/members page (no purchase in 90d).
+  // -------------------------------------------------------------------------
+  const allForMembership = await prisma.customer.findMany({
+    include: { pets: { select: { id: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  let memberSeq = 0;
+  let activated = 0;
+  for (const c of allForMembership) {
+    if (c.marketingConsent && c.pets.length > 0) {
+      memberSeq++;
+      const when = c.consentDate ?? c.createdAt;
+      await prisma.customer.update({
+        where: { id: c.id },
+        data: {
+          memberStatus: "ACTIVE",
+          memberId: `HW-${String(memberSeq).padStart(5, "0")}`,
+          joinDate: when,
+          claimedDate: when,
+        },
+      });
+      activated++;
+    }
+  }
+  // Give a couple of activated members some points so the points UI isn't all 0.
+  await prisma.customer.updateMany({ where: { memberStatus: "ACTIVE" }, data: { pointsBalance: 120 } });
+
   console.log("✓ Seed complete.");
-  console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4`);
+  console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4 | Members activated: ${activated}`);
 }
 
 main()

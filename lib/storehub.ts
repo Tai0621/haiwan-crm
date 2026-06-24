@@ -133,13 +133,16 @@ export async function syncStoreHubCustomers(): Promise<StoreHubCustomerSyncSumma
       const existing = await findExistingCustomer({ phone });
       if (existing) {
         const data = buildEnrichment(existing, { name }, phone);
-        if (Object.keys(data).length) {
-          await prisma.customer.update({ where: { id: existing.id }, data });
+        // Mirror StoreHub loyalty points for reconciliation (not the source of
+        // truth — the CRM's computed tier is). Always refreshed to the latest.
+        const extra = m.loyalty != null ? { posLoyaltyPoints: m.loyalty } : {};
+        if (Object.keys(data).length || Object.keys(extra).length) {
+          await prisma.customer.update({ where: { id: existing.id }, data: { ...data, ...extra } });
           updated++;
         }
       } else {
         await prisma.customer.create({
-          data: { phone, name, source: "STOREHUB", needsDetails: !name },
+          data: { phone, name, source: "STOREHUB", needsDetails: !name, posLoyaltyPoints: m.loyalty ?? null },
         });
         created++;
       }

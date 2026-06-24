@@ -7,6 +7,8 @@ import LinkTransactionForm from "@/app/transactions/LinkTransactionForm";
 import { unlinkTransaction } from "@/app/transactions/actions";
 import { predictionsForCustomer } from "@/lib/refill";
 import { inboxForCustomer } from "@/lib/tasks";
+import { memberView } from "@/lib/membership";
+import { claimMembershipAction, adjustPoints } from "@/app/actions/membership";
 import InboxRow from "@/app/components/InboxRow";
 import { marginMixForCustomer, pct } from "@/lib/analytics";
 import { formatPhoneDisplay, whatsappLink } from "@/lib/phone";
@@ -30,7 +32,7 @@ export default async function CustomerDetailPage({
 
   // These three reads are independent — run them in parallel so the page waits
   // on one round trip to the DB, not three back-to-back.
-  const [customer, predictions, mix, actions] = await Promise.all([
+  const [customer, predictions, mix, actions, member] = await Promise.all([
     prisma.customer.findUnique({
       where: { id },
       include: {
@@ -51,6 +53,7 @@ export default async function CustomerDetailPage({
     predictionsForCustomer(id),
     marginMixForCustomer(id),
     inboxForCustomer(id),
+    memberView(id),
   ]);
 
   if (!customer) notFound();
@@ -133,6 +136,86 @@ export default async function CustomerDetailPage({
           </div>
         )}
       </div>
+
+      {/* Membership */}
+      {member && (
+        <div className="bg-white border border-slate-200 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Membership</h2>
+            {member.memberStatus === "PROSPECT" && (
+              <form action={claimMembershipAction}>
+                <input type="hidden" name="customerId" value={id} />
+                <button className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-slate-800">
+                  Claim membership
+                </button>
+              </form>
+            )}
+          </div>
+
+          <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+            <div>
+              <dt className="text-slate-400">Status</dt>
+              <dd>
+                <span
+                  className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                    member.memberStatus === "ACTIVE"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : member.memberStatus === "LAPSED"
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {member.memberStatus}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Tier</dt>
+              <dd className="flex items-center gap-1.5 text-slate-800">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: member.tier.color }} />
+                {member.tier.name}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Member #</dt>
+              <dd className="font-mono text-slate-800">{member.memberId ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Member since</dt>
+              <dd className="text-slate-800">{member.joinDate ? fmtDate(member.joinDate) : "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Lifetime spend</dt>
+              <dd className="text-slate-800">{rm(member.lifetimeSpend)}</dd>
+            </div>
+            <div className="md:col-span-2">
+              <dt className="text-slate-400">Points</dt>
+              <dd className="flex items-center gap-2 text-slate-800">
+                {member.pointsBalance}
+                <form action={adjustPoints} className="inline-flex items-center gap-1">
+                  <input type="hidden" name="customerId" value={id} />
+                  <input
+                    name="delta"
+                    type="number"
+                    defaultValue={10}
+                    className="w-16 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
+                  />
+                  <button className="rounded border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    Apply
+                  </button>
+                </form>
+              </dd>
+            </div>
+          </dl>
+
+          {member.posLoyaltyPoints != null && member.posLoyaltyPoints !== member.pointsBalance && (
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              StoreHub loyalty shows <strong>{member.posLoyaltyPoints}</strong> pts vs the CRM&apos;s{" "}
+              <strong>{member.pointsBalance}</strong>. Review before relying on either — the CRM&apos;s computed tier is the source of truth.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Action needed — this customer's open inbox items (only shown if any) */}
       {actions.length > 0 && (

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getInbox, sweepExpiredHolds, type InboxItem } from "@/lib/tasks";
+import { reconcileMemberships } from "@/lib/membership";
 import InboxRow from "@/app/components/InboxRow";
 import QuickAdd from "@/app/components/QuickAdd";
 import type { Store, TaskType } from "@/app/generated/prisma/client";
@@ -28,9 +29,10 @@ export default async function DashboardPage({
   const storeFilter = (sp.store as Store | "ALL") || "ALL";
   const typeFilter = (sp.type as TaskType | "ALL") || "ALL";
 
-  // Flip any lapsed 24h holds to EXPIRED + spawn courtesy follow-ups before we
-  // read the inbox, so the list reflects the latest state on every load.
-  await sweepExpiredHolds();
+  // Flip any lapsed 24h holds to EXPIRED + spawn courtesy follow-ups, and lapse
+  // any members gone quiet (spawning WINBACK tasks), before reading the inbox so
+  // the list reflects the latest state on every load.
+  await Promise.all([sweepExpiredHolds(), reconcileMemberships()]);
 
   const [all, totalCustomers, needsDetails, activeSubs] = await Promise.all([
     getInbox(), // unfiltered — drives counts + the available filter pills

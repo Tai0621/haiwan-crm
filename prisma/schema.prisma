@@ -46,6 +46,16 @@ enum CustomerSource {
   OTHER
 }
 
+// Membership lifecycle (Phase 2) — the spine other systems read from.
+//   PROSPECT = has records but hasn't claimed (no consent / stub)
+//   ACTIVE   = claimed: consent given + a confirmed profile (>=1 pet)
+//   LAPSED   = was ACTIVE but no purchase in LAPSED_AFTER_DAYS (auto-winback)
+enum MemberStatus {
+  PROSPECT
+  ACTIVE
+  LAPSED
+}
+
 // Pet species.
 enum Species {
   DOG
@@ -211,6 +221,21 @@ model Customer {
   posTransactions  Int?
   posLastPurchase  DateTime?
 
+  // --- Membership spine (Phase 2) ---------------------------------------------
+  // memberStatus is the field everything else reads from. memberId is assigned
+  // (HW-#####) when a customer is activated/claimed. tier is computed, not stored.
+  memberStatus     MemberStatus  @default(PROSPECT)
+  // Assigned (HW-#####) on activation. Uniqueness is enforced in app code
+  // (lib/membership.ts) rather than a DB UNIQUE constraint, so this stays a
+  // plain additive column — no destructive table rebuild on existing data.
+  memberId         String?
+  joinDate         DateTime?     // first became a member
+  claimedDate      DateTime?     // when they claimed/activated (consent + profile)
+  pointsBalance    Int           @default(0)
+  // StoreHub loyalty points captured at sync, for reconciliation only (the CRM's
+  // computed tier is the source of truth; this just flags divergence).
+  posLoyaltyPoints Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -221,6 +246,8 @@ model Customer {
   whatsappLeads    WhatsAppLead[]
   tasks            Task[]
   refillOverlays   RefillOverlay[]
+
+  @@index([memberId])
 }
 
 // ---------------------------------------------------------------------------
