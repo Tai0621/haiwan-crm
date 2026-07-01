@@ -17,7 +17,8 @@ import { prisma } from "./db";
 import { dueSoonPredictions, predictionsForCustomer, type RefillPrediction } from "./refill";
 import { whatsappLink } from "./phone";
 import { renderTemplate, templateKeyForTask, type TemplateKey } from "./templates";
-import { REFILL_WINDOW_DAYS } from "./constants";
+import { REFILL_WINDOW_DAYS, categoryDefaultDays } from "./constants";
+import { activeSubscriptionKeySet } from "./subscriptions";
 import type { Prisma, Store, TaskType, TaskChannel, TaskStatus } from "../app/generated/prisma/client";
 
 // Shared relation shape for loading tasks into inbox items.
@@ -56,9 +57,10 @@ export interface InboxItem {
   status: TaskStatus;
   whatsappUrl: string | null;
 
-  // Refill-only identity, used by the overlay snooze/done actions.
+  // Refill-only identity, used by the overlay snooze/done + convert actions.
   refillProductId?: string;
   refillCycleDate?: Date;
+  refillIntervalDays?: number; // predicted repurchase gap, for "Convert to subscription"
 }
 
 export interface InboxFilter {
@@ -224,6 +226,7 @@ function refillToItem(p: RefillPrediction, now: Date): InboxItem {
     whatsappUrl: whatsappLink(p.customerPhone, text),
     refillProductId: p.productId,
     refillCycleDate: p.predictedNextDate,
+    refillIntervalDays: p.avgGapDays != null ? Math.round(p.avgGapDays) : categoryDefaultDays(p.productCategory),
   };
 }
 
@@ -249,6 +252,7 @@ export async function getInbox(filter: InboxFilter = {}): Promise<InboxItem[]> {
     dueSoonPredictions(),
     prisma.refillOverlay.findMany(),
   ]);
+  const subscribed = await activeSubscriptionKeySet();
 
   // Index overlays by customer:product for O(1) lookup during the merge.
   const overlayByKey = new Map<string, (typeof overlays)[number]>();
@@ -259,8 +263,10 @@ export async function getInbox(filter: InboxFilter = {}): Promise<InboxItem[]> {
   // Tasks → items
   for (const t of tasks) items.push(taskToItem(t, now));
 
-  // Refills → items, skipping any cleared/snoozed for their current cycle.
+  // Refills → items, skipping any cleared/snoozed for their current cycle, or any
+  // product the customer now has an active subscription for (managed instead).
   for (const p of predictions) {
+    if (subscribed.has(`${p.customerId}:${p.productId}`)) continue;
     const overlay = overlayByKey.get(`${p.customerId}:${p.productId}`);
     if (overlayHidesRefill(overlay, p.predictedNextDate, now)) continue;
     items.push(refillToItem(p, now));
@@ -303,6 +309,7 @@ export async function inboxForCustomer(customerId: string): Promise<InboxItem[]>
     predictionsForCustomer(customerId),
     prisma.refillOverlay.findMany({ where: { customerId } }),
   ]);
+  const subscribed = await activeSubscriptionKeySet();
 
   const overlayByKey = new Map<string, (typeof overlays)[number]>();
   for (const o of overlays) overlayByKey.set(`${o.customerId}:${o.productId}`, o);
@@ -311,9 +318,10 @@ export async function inboxForCustomer(customerId: string): Promise<InboxItem[]>
   for (const t of tasks) items.push(taskToItem(t, now));
 
   // predictionsForCustomer returns ALL consumables; keep only those actually due
-  // (within the refill window) so this matches the "action needed now" intent.
+  // (within the refill window), not managed by a subscription, and not cleared.
   for (const p of predictions) {
     if (p.daysUntilDue > REFILL_WINDOW_DAYS) continue;
+    if (subscribed.has(`${p.customerId}:${p.productId}`)) continue;
     const overlay = overlayByKey.get(`${p.customerId}:${p.productId}`);
     if (overlayHidesRefill(overlay, p.predictedNextDate, now)) continue;
     items.push(refillToItem(p, now));

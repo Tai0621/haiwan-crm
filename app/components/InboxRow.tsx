@@ -9,6 +9,7 @@ import {
   markRefillDone,
   snoozeRefill,
 } from "@/app/actions/tasks";
+import { convertRefillToSubscription } from "@/app/subscriptions/actions";
 import type { InboxItem } from "@/lib/tasks";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -116,6 +117,25 @@ export default function InboxRow({ item }: { item: InboxItem }) {
           >
             Open
           </Link>
+        )}
+
+        {item.kind === "refill" && item.customerId && item.refillProductId && (
+          <form action={convertRefillToSubscription} className="inline">
+            <input type="hidden" name="customerId" value={item.customerId} />
+            <input type="hidden" name="productId" value={item.refillProductId} />
+            <input type="hidden" name="intervalDays" value={item.refillIntervalDays ?? 30} />
+            <input
+              type="hidden"
+              name="nextDueDate"
+              value={item.refillCycleDate ? new Date(item.refillCycleDate).toISOString() : ""}
+            />
+            <button
+              title="Convert this refill into a managed subscription"
+              className="rounded border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100"
+            >
+              Subscribe
+            </button>
+          </form>
         )}
 
         <form action={doneAction} className="inline">

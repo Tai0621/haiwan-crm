@@ -32,7 +32,7 @@ export default async function CustomerDetailPage({
 
   // These three reads are independent — run them in parallel so the page waits
   // on one round trip to the DB, not three back-to-back.
-  const [customer, predictions, mix, actions, member] = await Promise.all([
+  const [customer, predictions, mix, actions, member, activeSubs] = await Promise.all([
     prisma.customer.findUnique({
       where: { id },
       include: {
@@ -54,9 +54,14 @@ export default async function CustomerDetailPage({
     marginMixForCustomer(id),
     inboxForCustomer(id),
     memberView(id),
+    prisma.subscription.findMany({ where: { customerId: id, status: "ACTIVE" }, select: { productId: true } }),
   ]);
 
   if (!customer) notFound();
+
+  // A product managed by an active subscription is no longer a manual refill.
+  const subscribedProductIds = new Set(activeSubs.map((s) => s.productId));
+  const visiblePredictions = predictions.filter((p) => !subscribedProductIds.has(p.productId));
 
   const wa = whatsappLink(customer.phone);
 
@@ -255,8 +260,10 @@ export default async function CustomerDetailPage({
           <p className="text-xs text-slate-400 mb-3">
             Consumables only · based on this customer&apos;s repurchase intervals
           </p>
-          {predictions.length === 0 ? (
-            <p className="text-sm text-slate-400">No consumable purchases yet.</p>
+          {visiblePredictions.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              {predictions.length === 0 ? "No consumable purchases yet." : "All consumables are managed by subscriptions."}
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead className="text-slate-400 text-left text-xs">
@@ -268,7 +275,7 @@ export default async function CustomerDetailPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {predictions.map((p) => (
+                {visiblePredictions.map((p) => (
                   <tr key={p.productId}>
                     <td className="py-1.5 text-slate-700">{p.productName}</td>
                     <td className="py-1.5 text-slate-500">{p.petNames.join(", ") || "—"}</td>

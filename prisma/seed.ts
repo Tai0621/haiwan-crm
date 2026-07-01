@@ -521,7 +521,10 @@ async function main() {
   await prisma.subscription.create({
     data: {
       customerId: c1.id, petId: p1.id, productId: hw_fc_001.id,
-      intervalDays: 28, nextDueDate: addDays(new Date(), 2), status: "ACTIVE",
+      // Already due — the dashboard/cron reconcile raises a SUBSCRIPTION_DUE task
+      // for this on first load, and Aishah's manual refill for this product is
+      // suppressed (managed by the subscription instead).
+      intervalDays: 28, nextDueDate: addDays(new Date(), -1), status: "ACTIVE",
     },
   });
   await prisma.subscription.create({

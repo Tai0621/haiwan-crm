@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getInbox, sweepExpiredHolds, type InboxItem } from "@/lib/tasks";
 import { reconcileMemberships } from "@/lib/membership";
+import { reconcileSubscriptions, estimatedMrr } from "@/lib/subscriptions";
+import { rm } from "@/lib/format";
 import InboxRow from "@/app/components/InboxRow";
 import QuickAdd from "@/app/components/QuickAdd";
 import type { Store, TaskType } from "@/app/generated/prisma/client";
@@ -29,16 +31,15 @@ export default async function DashboardPage({
   const storeFilter = (sp.store as Store | "ALL") || "ALL";
   const typeFilter = (sp.type as TaskType | "ALL") || "ALL";
 
-  // Flip any lapsed 24h holds to EXPIRED + spawn courtesy follow-ups, and lapse
-  // any members gone quiet (spawning WINBACK tasks), before reading the inbox so
-  // the list reflects the latest state on every load.
-  await Promise.all([sweepExpiredHolds(), reconcileMemberships()]);
+  // Flip lapsed 24h holds to EXPIRED (+ courtesy follow-ups), lapse quiet members
+  // (+ WINBACK tasks), and raise SUBSCRIPTION_DUE tasks for due subscriptions,
+  // before reading the inbox so the list reflects the latest state on every load.
+  await Promise.all([sweepExpiredHolds(), reconcileMemberships(), reconcileSubscriptions()]);
 
-  const [all, totalCustomers, needsDetails, activeSubs] = await Promise.all([
+  const [all, activeSubs, mrr] = await Promise.all([
     getInbox(), // unfiltered — drives counts + the available filter pills
-    prisma.customer.count(),
-    prisma.customer.count({ where: { needsDetails: true } }),
     prisma.subscription.count({ where: { status: "ACTIVE" } }),
+    estimatedMrr(),
   ]);
 
   const overdue = all.filter((i) => i.isOverdue).length;
@@ -71,8 +72,8 @@ export default async function DashboardPage({
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="To action now" value={all.length} accent={all.length ? undefined : "muted"} />
         <StatCard label="Overdue" value={overdue} accent={overdue ? "red" : "muted"} />
-        <StatCard label="Needs details" value={needsDetails} href="/customers?needs=1" accent="amber" />
         <StatCard label="Active subscriptions" value={activeSubs} href="/subscriptions" />
+        <StatCard label="Recurring / mo" value={rm(mrr)} href="/subscriptions" accent="emerald" />
       </div>
 
       <QuickAdd />
@@ -125,18 +126,20 @@ function StatCard({
   accent,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   href?: string;
-  accent?: "amber" | "red" | "muted";
+  accent?: "amber" | "red" | "muted" | "emerald";
 }) {
   const color =
     accent === "amber"
       ? "text-amber-600"
       : accent === "red"
         ? "text-red-600"
-        : accent === "muted"
-          ? "text-slate-400"
-          : "text-slate-900";
+        : accent === "emerald"
+          ? "text-emerald-600"
+          : accent === "muted"
+            ? "text-slate-400"
+            : "text-slate-900";
   const inner = (
     <div className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
       <div className={`text-3xl font-bold ${color}`}>{value}</div>

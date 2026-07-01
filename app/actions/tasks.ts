@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { findExistingCustomer } from "@/lib/customer-resolve";
 import { isAuthenticated } from "@/lib/auth";
+import { advanceSubscriptionCycle } from "@/lib/subscriptions";
 import { revalidatePath } from "next/cache";
 import type { Store, TaskChannel } from "@/app/generated/prisma/client";
 
@@ -161,10 +162,19 @@ export async function markTaskDone(formData: FormData) {
   await requireSession();
   const id = String(formData.get("taskId") ?? "");
   if (!id) throw new Error("Missing task id.");
-  await prisma.task.update({
+  const task = await prisma.task.update({
     where: { id },
     data: { status: "DONE", completedAt: new Date() },
+    select: { type: true, customerId: true, productId: true },
   });
+
+  // Completing a subscription reminder advances the subscription to its next
+  // cycle so the reminder re-fires one interval on.
+  if (task.type === "SUBSCRIPTION_DUE" && task.customerId && task.productId) {
+    await advanceSubscriptionCycle(task.customerId, task.productId);
+    revalidatePath("/subscriptions");
+  }
+
   revalidatePath("/");
   revalidatePath("/customers/[id]", "page");
 }

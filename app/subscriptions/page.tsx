@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, rm } from "@/lib/format";
 import { SUBSCRIPTION_STATUS_LABELS } from "@/lib/constants";
 import { formatPhoneDisplay } from "@/lib/phone";
+import { monthlyValue } from "@/lib/subscriptions";
 import NewSubscriptionForm from "./NewSubscriptionForm";
 import { updateSubscriptionStatus, deleteSubscription } from "./actions";
 
@@ -21,7 +22,7 @@ export default async function SubscriptionsPage() {
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         pet: { select: { name: true } },
-        product: { select: { name: true } },
+        product: { select: { name: true, retailPrice: true } },
       },
     }),
     prisma.customer.findMany({
@@ -34,6 +35,10 @@ export default async function SubscriptionsPage() {
     }),
   ]);
 
+  const activeSubs = subs.filter((s) => s.status === "ACTIVE");
+  const churnCount = subs.filter((s) => s.status !== "ACTIVE").length;
+  const mrr = activeSubs.reduce((sum, s) => sum + monthlyValue(s.product.retailPrice, s.intervalDays), 0);
+
   return (
     <div className="space-y-4">
       <div>
@@ -41,6 +46,22 @@ export default async function SubscriptionsPage() {
         <p className="text-sm text-slate-500">
           Recurring order intents. Basic tracking — billing is handled elsewhere.
         </p>
+      </div>
+
+      {/* Recurring-revenue summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div className="text-2xl font-bold text-emerald-700">{rm(mrr)}</div>
+          <div className="mt-1 text-sm text-emerald-800">Est. recurring / month</div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="text-2xl font-bold text-slate-900">{activeSubs.length}</div>
+          <div className="mt-1 text-sm text-slate-500">Active</div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="text-2xl font-bold text-slate-400">{churnCount}</div>
+          <div className="mt-1 text-sm text-slate-500">Paused / cancelled</div>
+        </div>
       </div>
 
       <NewSubscriptionForm customers={customers} products={products} />
@@ -53,6 +74,7 @@ export default async function SubscriptionsPage() {
               <th className="px-3 py-2 font-medium">Pet</th>
               <th className="px-3 py-2 font-medium">Product</th>
               <th className="px-3 py-2 font-medium text-right">Every</th>
+              <th className="px-3 py-2 font-medium text-right">Value / mo</th>
               <th className="px-3 py-2 font-medium">Next due</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium text-right">Actions</th>
@@ -70,6 +92,9 @@ export default async function SubscriptionsPage() {
                 <td className="px-3 py-2 text-slate-600">{s.pet?.name ?? "—"}</td>
                 <td className="px-3 py-2 text-slate-700">{s.product.name}</td>
                 <td className="px-3 py-2 text-right text-slate-600">{s.intervalDays}d</td>
+                <td className="px-3 py-2 text-right text-slate-600">
+                  {s.status === "ACTIVE" ? rm(monthlyValue(s.product.retailPrice, s.intervalDays)) : "—"}
+                </td>
                 <td className="px-3 py-2 text-slate-700">{fmtDate(s.nextDueDate)}</td>
                 <td className="px-3 py-2">
                   <span className={`text-[10px] uppercase font-medium px-2 py-0.5 rounded ${STATUS_STYLES[s.status]}`}>
@@ -113,7 +138,7 @@ export default async function SubscriptionsPage() {
             ))}
             {subs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                   No subscriptions yet.
                 </td>
               </tr>

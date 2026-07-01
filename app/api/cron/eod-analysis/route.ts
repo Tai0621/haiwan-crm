@@ -12,6 +12,7 @@ import type { NextRequest } from "next/server";
 import { runEodAnalysis } from "@/lib/whatsapp/analyze";
 import { sweepExpiredHolds } from "@/lib/tasks";
 import { reconcileMemberships } from "@/lib/membership";
+import { reconcileSubscriptions } from "@/lib/subscriptions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // seconds — generous headroom for the LLM calls
@@ -28,11 +29,18 @@ export async function GET(request: NextRequest) {
   // Backstop for the Action Inbox + membership spine: flip lapsed 24h holds to
   // EXPIRED (spawning courtesy follow-ups) and lapse quiet members (spawning
   // WINBACK tasks), so loops close even on a day no one opens the app.
-  const [holdsSwept, membersReconciled] = await Promise.all([
+  const [holdsSwept, membersReconciled, subscriptionsDue] = await Promise.all([
     sweepExpiredHolds(),
     reconcileMemberships(),
+    reconcileSubscriptions(),
   ]);
 
   const result = await runEodAnalysis();
-  return NextResponse.json({ ranAt: new Date().toISOString(), holdsSwept, membersReconciled, ...result });
+  return NextResponse.json({
+    ranAt: new Date().toISOString(),
+    holdsSwept,
+    membersReconciled,
+    subscriptionsDue,
+    ...result,
+  });
 }
