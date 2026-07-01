@@ -10,6 +10,7 @@ const TABLES: Array<{ slug: string; label: string; desc: string }> = [
   { slug: "transactions", label: "Transactions", desc: "Sales events (receipts)" },
   { slug: "lines", label: "Transaction lines", desc: "Line items, linked to product & pet" },
   { slug: "subscriptions", label: "Subscriptions", desc: "Recurring order intents" },
+  { slug: "finance", label: "Finance (margin mix)", desc: "Monthly revenue / COGS / gross profit by supplier type" },
   { slug: "tasks", label: "Tasks", desc: "Action Inbox items — leads, holds, inquiries, follow-ups" },
   { slug: "refilloverlays", label: "Refill overlays", desc: "Done/snooze state for computed refill predictions" },
 ];
@@ -53,7 +54,9 @@ export default async function ExportPage() {
             <div>
               <div className="font-medium text-slate-900">
                 {t.label}{" "}
-                <span className="text-xs text-slate-400 font-normal">({counts[t.slug]} rows)</span>
+                {counts[t.slug] != null && (
+                  <span className="text-xs text-slate-400 font-normal">({counts[t.slug]} rows)</span>
+                )}
               </div>
               <div className="text-xs text-slate-500">{t.desc}</div>
             </div>

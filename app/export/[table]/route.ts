@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { monthlyMarginMix } from "@/lib/analytics";
 import Papa from "papaparse";
 
 // =============================================================================
@@ -162,6 +163,25 @@ async function buildRows(table: string): Promise<Rows | null> {
         createdAt: iso(b.createdAt),
         updatedAt: iso(b.updatedAt),
       }));
+    }
+    case "finance": {
+      // Long-format margin report: one row per month × supplier type, so it
+      // reconciles line-by-line against the management accounts.
+      const months = await monthlyMarginMix();
+      const rows: Rows = [];
+      for (const m of months) {
+        for (const k of ["INHOUSE", "CONSIGNMENT", "TRADING", "UNCLASSIFIED"] as const) {
+          if (m[k].revenue === 0 && m[k].cogs === 0) continue;
+          rows.push({
+            month: m.month,
+            supplierType: k,
+            revenue: m[k].revenue,
+            cogs: k === "UNCLASSIFIED" ? "" : m[k].cogs,
+            grossProfit: k === "UNCLASSIFIED" ? "" : m[k].grossProfit,
+          });
+        }
+      }
+      return rows;
     }
     case "refilloverlays": {
       const rows = await prisma.refillOverlay.findMany({ orderBy: { createdAt: "asc" } });

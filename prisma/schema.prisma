@@ -625,3 +625,13 @@ model Brand {
 
   @@index([status])
 }
+
+// ---------------------------------------------------------------------------
+// AppSetting — a tiny singleton (id="default") for app-wide targets/config.
+// Phase 5: targetInhousePct is leadership's goal for the in-house revenue share.
+// ---------------------------------------------------------------------------
+model AppSetting {
+  id               String   @id @default("default")
+  targetInhousePct Float    @default(0)
+  updatedAt        DateTime @updatedAt
+}

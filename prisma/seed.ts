@@ -659,10 +659,17 @@ async function main() {
     brandCount++;
   }
 
+  // Finance target (Phase 5): leadership's in-house revenue-share goal.
+  await prisma.appSetting.upsert({
+    where: { id: "default" },
+    update: {},
+    create: { id: "default", targetInhousePct: 40 },
+  });
+
   console.log("✓ Seed complete.");
   console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4 | Members activated: ${activated} | Brands: ${brandCount}`);
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(() => prisma.$disconnect());
+  .then(async () => { await prisma.$disconnect(); process.exit(0); })
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });

@@ -40,6 +40,9 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
   revenue: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z" /><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /></svg>
   ),
+  finance: ({ className = ic }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8" /><path d="M8 10h8" /><path d="M8 14h4" /><path d="M16 18v-4" /></svg>
+  ),
   subscriptions: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v6h6" /><path d="M21 12A9 9 0 0 0 6 5.3L3 8" /><path d="M21 22v-6h-6" /><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7" /></svg>
   ),
@@ -76,6 +79,7 @@ const LINKS: Array<{ href: string; label: string; icon: keyof typeof Icons }> = 
   { href: "/brands", label: "Brands", icon: "brands" },
   { href: "/analysis", label: "Analysis", icon: "analysis" },
   { href: "/revenue", label: "Revenue mix", icon: "revenue" },
+  { href: "/finance", label: "Finance", icon: "finance" },
   { href: "/subscriptions", label: "Subscriptions", icon: "subscriptions" },
   { href: "/whatsapp", label: "WhatsApp", icon: "whatsapp" },
   { href: "/import", label: "Import", icon: "import" },

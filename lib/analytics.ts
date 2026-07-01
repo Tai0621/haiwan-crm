@@ -348,3 +348,96 @@ export async function monthlyRevenueMix(): Promise<MonthlyRevenueRow[]> {
 
   return Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
 }
+
+// ---------------------------------------------------------------------------
+// Margin mix (Phase 5) — the number finance trusts. Same revenue-by-supplier
+// basis as the north-star chart, plus COGS (quantity × product.costPrice) and
+// gross profit, so leadership sees MARGIN mix, not just revenue mix.
+// Unclassified lines (no matched product) have no cost — their revenue is the
+// reconciliation gap to close against the management accounts.
+// ---------------------------------------------------------------------------
+export interface MarginBucket {
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+}
+export interface MonthlyMargin {
+  month: string;
+  INHOUSE: MarginBucket;
+  CONSIGNMENT: MarginBucket;
+  TRADING: MarginBucket;
+  UNCLASSIFIED: MarginBucket;
+}
+
+function emptyBucket(): MarginBucket {
+  return { revenue: 0, cogs: 0, grossProfit: 0 };
+}
+function emptyMonthlyMargin(month: string): MonthlyMargin {
+  return { month, INHOUSE: emptyBucket(), CONSIGNMENT: emptyBucket(), TRADING: emptyBucket(), UNCLASSIFIED: emptyBucket() };
+}
+
+export async function monthlyMarginMix(): Promise<MonthlyMargin[]> {
+  const lines = await prisma.transactionLine.findMany({
+    select: {
+      quantity: true,
+      lineTotal: true,
+      product: { select: { supplierType: true, costPrice: true } },
+      transaction: { select: { transactionDate: true } },
+    },
+  });
+
+  const byMonth = new Map<string, MonthlyMargin>();
+  for (const l of lines) {
+    const d = l.transaction.transactionDate;
+    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!byMonth.has(month)) byMonth.set(month, emptyMonthlyMargin(month));
+    const row = byMonth.get(month)!;
+    const bucket: SupplierBucket = l.product?.supplierType ?? "UNCLASSIFIED";
+    const cogs = l.product?.costPrice != null ? l.product.costPrice * l.quantity : 0;
+    row[bucket].revenue += l.lineTotal;
+    row[bucket].cogs += cogs;
+    row[bucket].grossProfit += l.lineTotal - cogs;
+  }
+
+  return Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export interface MarginSummary {
+  buckets: Record<SupplierBucket, MarginBucket>;
+  totalRevenue: number;
+  totalCogs: number;
+  totalGrossProfit: number;
+  inhouseRevenuePct: number; // in-house share of revenue
+  inhouseMarginPct: number; // in-house share of gross profit
+  unclassifiedRevenue: number; // reconciliation gap
+}
+
+export async function marginSummary(months?: MonthlyMargin[]): Promise<MarginSummary> {
+  const data = months ?? (await monthlyMarginMix());
+  const buckets: Record<SupplierBucket, MarginBucket> = {
+    INHOUSE: emptyBucket(),
+    CONSIGNMENT: emptyBucket(),
+    TRADING: emptyBucket(),
+    UNCLASSIFIED: emptyBucket(),
+  };
+  for (const m of data) {
+    for (const k of ["INHOUSE", "CONSIGNMENT", "TRADING", "UNCLASSIFIED"] as const) {
+      buckets[k].revenue += m[k].revenue;
+      buckets[k].cogs += m[k].cogs;
+      buckets[k].grossProfit += m[k].grossProfit;
+    }
+  }
+  const totalRevenue = (["INHOUSE", "CONSIGNMENT", "TRADING", "UNCLASSIFIED"] as const).reduce((s, k) => s + buckets[k].revenue, 0);
+  const totalCogs = (["INHOUSE", "CONSIGNMENT", "TRADING", "UNCLASSIFIED"] as const).reduce((s, k) => s + buckets[k].cogs, 0);
+  const totalGrossProfit = totalRevenue - totalCogs;
+
+  return {
+    buckets,
+    totalRevenue,
+    totalCogs,
+    totalGrossProfit,
+    inhouseRevenuePct: totalRevenue > 0 ? (buckets.INHOUSE.revenue / totalRevenue) * 100 : 0,
+    inhouseMarginPct: totalGrossProfit > 0 ? (buckets.INHOUSE.grossProfit / totalGrossProfit) * 100 : 0,
+    unclassifiedRevenue: buckets.UNCLASSIFIED.revenue,
+  };
+}
