@@ -31,6 +31,9 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
   products: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
   ),
+  brands: ({ className = ic }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82Z" /><circle cx="7.5" cy="7.5" r="1.5" /></svg>
+  ),
   analysis: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m19 9-5 5-4-4-3 3" /></svg>
   ),
@@ -70,6 +73,7 @@ const LINKS: Array<{ href: string; label: string; icon: keyof typeof Icons }> = 
   { href: "/members", label: "Members", icon: "members" },
   { href: "/transactions", label: "Transactions", icon: "transactions" },
   { href: "/products", label: "Products", icon: "products" },
+  { href: "/brands", label: "Brands", icon: "brands" },
   { href: "/analysis", label: "Analysis", icon: "analysis" },
   { href: "/revenue", label: "Revenue mix", icon: "revenue" },
   { href: "/subscriptions", label: "Subscriptions", icon: "subscriptions" },

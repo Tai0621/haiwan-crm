@@ -61,6 +61,10 @@ export interface InboxItem {
   refillProductId?: string;
   refillCycleDate?: Date;
   refillIntervalDays?: number; // predicted repurchase gap, for "Convert to subscription"
+
+  // BRAND_REVIEW tasks point at a brand instead of a customer.
+  brandId?: string;
+  brandName?: string;
 }
 
 export interface InboxFilter {
@@ -149,7 +153,17 @@ function reasonForTask(type: TaskType, holdItem: string | null, productName: str
   }
 }
 
-function taskToItem(t: TaskRow, now: Date): InboxItem {
+/** Resolve brand names for BRAND_REVIEW tasks (brandId is an app-side join). */
+async function brandNameMap(tasks: { brandId: string | null }[]): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(tasks.map((t) => t.brandId).filter((x): x is string => !!x)));
+  const map = new Map<string, string>();
+  if (ids.length === 0) return map;
+  const brands = await prisma.brand.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+  for (const b of brands) map.set(b.id, b.name);
+  return map;
+}
+
+function taskToItem(t: TaskRow, now: Date, brandName?: string): InboxItem {
   const productName = t.product?.name ?? null;
   const tplKey = templateForTask(t.type, t.holdItem);
   const text = renderTemplate(tplKey, {
@@ -178,6 +192,8 @@ function taskToItem(t: TaskRow, now: Date): InboxItem {
     holdExpiresAt: t.holdExpiresAt,
     status: t.status,
     whatsappUrl: t.customer?.phone ? whatsappLink(t.customer.phone, text) : null,
+    brandId: t.brandId ?? undefined,
+    brandName,
   };
 }
 
@@ -254,6 +270,9 @@ export async function getInbox(filter: InboxFilter = {}): Promise<InboxItem[]> {
   ]);
   const subscribed = await activeSubscriptionKeySet();
 
+  // Brand names for any BRAND_REVIEW tasks (brandId is an app-side join).
+  const brandNames = await brandNameMap(tasks);
+
   // Index overlays by customer:product for O(1) lookup during the merge.
   const overlayByKey = new Map<string, (typeof overlays)[number]>();
   for (const o of overlays) overlayByKey.set(`${o.customerId}:${o.productId}`, o);
@@ -261,7 +280,7 @@ export async function getInbox(filter: InboxFilter = {}): Promise<InboxItem[]> {
   const items: InboxItem[] = [];
 
   // Tasks → items
-  for (const t of tasks) items.push(taskToItem(t, now));
+  for (const t of tasks) items.push(taskToItem(t, now, t.brandId ? brandNames.get(t.brandId) : undefined));
 
   // Refills → items, skipping any cleared/snoozed for their current cycle, or any
   // product the customer now has an active subscription for (managed instead).

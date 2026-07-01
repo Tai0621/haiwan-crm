@@ -74,7 +74,9 @@ export default function InboxRow({ item }: { item: InboxItem }) {
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_STYLES[item.type] ?? TYPE_STYLES.CUSTOM}`}>
             {TYPE_LABELS[item.type] ?? "Task"}
           </span>
-          <span className="truncate font-medium text-slate-900">{item.customerName ?? "Unnamed"}</span>
+          <span className="truncate font-medium text-slate-900">
+            {item.brandName ?? item.customerName ?? "Unnamed"}
+          </span>
           {item.petLabel && <span className="text-sm text-slate-500">· {item.petLabel}</span>}
           {item.customerPhone && (
             <span className="font-mono text-xs text-slate-400">{formatPhoneDisplay(item.customerPhone)}</span>
@@ -116,6 +118,14 @@ export default function InboxRow({ item }: { item: InboxItem }) {
             className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
           >
             Open
+          </Link>
+        )}
+        {item.brandId && (
+          <Link
+            href={`/brands/${item.brandId}`}
+            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Open brand
           </Link>
         )}
 

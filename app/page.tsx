@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getInbox, sweepExpiredHolds, type InboxItem } from "@/lib/tasks";
 import { reconcileMemberships } from "@/lib/membership";
 import { reconcileSubscriptions, estimatedMrr } from "@/lib/subscriptions";
+import { reconcileBrandTrials } from "@/lib/brands";
 import { rm } from "@/lib/format";
 import InboxRow from "@/app/components/InboxRow";
 import QuickAdd from "@/app/components/QuickAdd";
@@ -34,7 +35,12 @@ export default async function DashboardPage({
   // Flip lapsed 24h holds to EXPIRED (+ courtesy follow-ups), lapse quiet members
   // (+ WINBACK tasks), and raise SUBSCRIPTION_DUE tasks for due subscriptions,
   // before reading the inbox so the list reflects the latest state on every load.
-  await Promise.all([sweepExpiredHolds(), reconcileMemberships(), reconcileSubscriptions()]);
+  await Promise.all([
+    sweepExpiredHolds(),
+    reconcileMemberships(),
+    reconcileSubscriptions(),
+    reconcileBrandTrials(),
+  ]);
 
   const [all, activeSubs, mrr] = await Promise.all([
     getInbox(), // unfiltered — drives counts + the available filter pills

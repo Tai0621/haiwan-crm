@@ -619,8 +619,48 @@ async function main() {
   // Give a couple of activated members some points so the points UI isn't all 0.
   await prisma.customer.updateMany({ where: { memberStatus: "ACTIVE" }, data: { pointsBalance: 120 } });
 
+  // -------------------------------------------------------------------------
+  // Brand pipeline backfill (Phase 4) — one Brand per distinct product brand,
+  // products linked via brandId. A couple are put in TRIAL (one past 90 days to
+  // demonstrate the auto BRAND_REVIEW task) with varied owner/status/fit.
+  // -------------------------------------------------------------------------
+  const brandNames = Array.from(new Set(products.map((p) => p.brand).filter((b): b is string => !!b)));
+  const owners = ["Dini", "Jeany", "Dannie", "Win Nie", "Evi"];
+  const overrides: Record<string, { status?: string; trialDaysAgo?: number; fit?: string; nextStep?: string }> = {
+    "Ziwi Peak": { status: "TRIAL", trialDaysAgo: 100, fit: "HIGH", nextStep: "90-day review — decide keep / drop / co-create" },
+    "Open Farm": { status: "TRIAL", trialDaysAgo: 30, fit: "CONDITIONAL", nextStep: "Monitor sell-through" },
+    PetVital: { status: "IN_TALKS", fit: "VERIFY", nextStep: "Awaiting sample pack" },
+    Feliway: { status: "PROSPECT", fit: "SKIP" },
+    Haiwan: { status: "ACTIVE", fit: "HIGH" },
+  };
+  let bi = 0;
+  let brandCount = 0;
+  for (const name of brandNames) {
+    const firstProd = products.find((p) => p.brand === name)!;
+    const ov = overrides[name] ?? {};
+    const st = firstProd.supplierType;
+    const brand = await prisma.brand.upsert({
+      where: { name },
+      update: {},
+      create: {
+        name,
+        supplierType: st as "TRADING" | "CONSIGNMENT" | "INHOUSE",
+        status: (ov.status as "PROSPECT" | "IN_TALKS" | "TRIAL" | "ACTIVE" | "DROPPED") ?? "ACTIVE",
+        owner: owners[bi % owners.length],
+        aestheticFit: (ov.fit as "HIGH" | "CONDITIONAL" | "VERIFY" | "SKIP") ?? "VERIFY",
+        nextStep: ov.nextStep ?? null,
+        trialStartDate: ov.trialDaysAgo != null ? daysAgo(ov.trialDaysAgo) : null,
+        commissionPct: st === "CONSIGNMENT" ? 25 : null,
+        listingFee: st === "TRADING" ? 200 : null,
+      },
+    });
+    await prisma.product.updateMany({ where: { brand: name }, data: { brandId: brand.id } });
+    bi++;
+    brandCount++;
+  }
+
   console.log("✓ Seed complete.");
-  console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4 | Members activated: ${activated}`);
+  console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4 | Members activated: ${activated} | Brands: ${brandCount}`);
 }
 
 main()

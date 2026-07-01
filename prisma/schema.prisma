@@ -119,6 +119,34 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+// --- Supplier / consignment pipeline (Phase 4) -------------------------------
+
+// How Haiwan works with a brand partner. Extends the product SupplierType with
+// CO_CREATION (a jointly developed line — the strategic end-goal of a trial).
+enum BrandSupplierType {
+  TRADING
+  CONSIGNMENT
+  INHOUSE
+  CO_CREATION
+}
+
+// Where a brand sits in the partnership pipeline.
+enum BrandStatus {
+  PROSPECT
+  IN_TALKS
+  TRIAL
+  ACTIVE
+  DROPPED
+}
+
+// Brand-fit against Haiwan's aesthetic/positioning, from the sourcing review.
+enum AestheticFit {
+  HIGH
+  CONDITIONAL
+  VERIFY
+  SKIP
+}
+
 // Direction of a WhatsApp message relative to Haiwan.
 //   INBOUND  = customer -> Haiwan
 //   OUTBOUND = Haiwan  -> customer
@@ -305,7 +333,10 @@ model Product {
   id            String           @id @default(cuid())
   sku           String           @unique
   name          String
-  brand         String?
+  brand         String?  // legacy free-text brand label; kept as-is
+  // FK to Brand (Phase 4). App-side join (no DB relation) so this stays an
+  // additive column — see lib/brands.ts. Backfilled from `brand` by name.
+  brandId       String?
   // Free-text category: food, litter, treat, accessory, bed, supplement, …
   category      String
   targetSpecies TargetSpecies    @default(ANY)
@@ -339,6 +370,8 @@ model Product {
   subscriptions Subscription[]
   tasks         Task[]
   refillOverlays RefillOverlay[]
+
+  @@index([brandId])
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +546,9 @@ model Task {
   pet        Pet?        @relation(fields: [petId], references: [id], onDelete: SetNull)
   productId  String?
   product    Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  // BRAND_REVIEW tasks (Phase 4) point at a Brand instead of a customer.
+  // App-side join (no DB relation) to keep this an additive column.
+  brandId    String?
 
   // When this task is due / its first-reply deadline. Drives inbox ordering.
   dueAt      DateTime
@@ -531,6 +567,7 @@ model Task {
 
   @@index([status, dueAt])
   @@index([customerId])
+  @@index([brandId])
 }
 
 // ---------------------------------------------------------------------------
@@ -560,4 +597,31 @@ model RefillOverlay {
 
   @@unique([customerId, productId])
   @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Brand — a supplier/brand partnership tracked inside the CRM (Phase 4), so
+// keep/drop decisions are driven by real sell-through instead of a spreadsheet.
+// Products link via Product.brandId (app-side join). Trial brands get a
+// BRAND_REVIEW task at day 90 (see lib/brands.ts).
+// ---------------------------------------------------------------------------
+model Brand {
+  id             String            @id @default(cuid())
+  name           String            @unique
+  website        String?
+  country        String?
+  supplierType   BrandSupplierType @default(TRADING)
+  status         BrandStatus       @default(PROSPECT)
+  owner          String?           // team member: Dini | Jeany | Dannie | Win Nie | Evi
+  nextStep       String?
+  listingFee     Float?            // deal terms: upfront listing fee (RM)
+  commissionPct  Float?            // deal terms: commission % (consignment)
+  trialStartDate DateTime?         // start of the 90-day trial window
+  aestheticFit   AestheticFit?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
 }

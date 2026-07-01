@@ -132,6 +132,7 @@ async function buildRows(table: string): Promise<Rows | null> {
         customerId: t.customerId,
         petId: t.petId,
         productId: t.productId,
+        brandId: t.brandId,
         dueAt: iso(t.dueAt),
         status: t.status,
         note: t.note,
@@ -140,6 +141,26 @@ async function buildRows(table: string): Promise<Rows | null> {
         snoozedUntil: iso(t.snoozedUntil),
         createdAt: iso(t.createdAt),
         completedAt: iso(t.completedAt),
+      }));
+    }
+    case "brands": {
+      const rows = await prisma.brand.findMany({ orderBy: { name: "asc" } });
+      return rows.map((b) => ({
+        id: b.id,
+        name: b.name,
+        website: b.website,
+        country: b.country,
+        supplierType: b.supplierType,
+        status: b.status,
+        owner: b.owner,
+        nextStep: b.nextStep,
+        listingFee: b.listingFee,
+        commissionPct: b.commissionPct,
+        trialStartDate: iso(b.trialStartDate),
+        aestheticFit: b.aestheticFit,
+        notes: b.notes,
+        createdAt: iso(b.createdAt),
+        updatedAt: iso(b.updatedAt),
       }));
     }
     case "refilloverlays": {

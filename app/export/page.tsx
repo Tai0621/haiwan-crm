@@ -6,6 +6,7 @@ const TABLES: Array<{ slug: string; label: string; desc: string }> = [
   { slug: "customers", label: "Customers", desc: "Contacts/payers, phone as identity key, PDPA consent" },
   { slug: "pets", label: "Pets", desc: "The central entity — linked to a customer" },
   { slug: "products", label: "Products", desc: "Catalog incl. supplierType & isConsumable" },
+  { slug: "brands", label: "Brands", desc: "Supplier/consignment partnerships & pipeline status" },
   { slug: "transactions", label: "Transactions", desc: "Sales events (receipts)" },
   { slug: "lines", label: "Transaction lines", desc: "Line items, linked to product & pet" },
   { slug: "subscriptions", label: "Subscriptions", desc: "Recurring order intents" },
@@ -14,11 +15,12 @@ const TABLES: Array<{ slug: string; label: string; desc: string }> = [
 ];
 
 export default async function ExportPage() {
-  const [customers, pets, products, transactions, lines, subscriptions, tasks, refilloverlays] =
+  const [customers, pets, products, brands, transactions, lines, subscriptions, tasks, refilloverlays] =
     await Promise.all([
       prisma.customer.count(),
       prisma.pet.count(),
       prisma.product.count(),
+      prisma.brand.count(),
       prisma.transaction.count(),
       prisma.transactionLine.count(),
       prisma.subscription.count(),
@@ -29,6 +31,7 @@ export default async function ExportPage() {
     customers,
     pets,
     products,
+    brands,
     transactions,
     lines,
     subscriptions,
