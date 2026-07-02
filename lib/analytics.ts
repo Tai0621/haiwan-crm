@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { prisma } from "./db";
+import { monthKeyMYT } from "./format";
 
 export type SupplierBucket = "INHOUSE" | "CONSIGNMENT" | "TRADING" | "UNCLASSIFIED";
 
@@ -336,8 +337,7 @@ export async function monthlyRevenueMix(): Promise<MonthlyRevenueRow[]> {
 
   const byMonth = new Map<string, MonthlyRevenueRow>();
   for (const l of lines) {
-    const d = l.transaction.transactionDate;
-    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const month = monthKeyMYT(l.transaction.transactionDate);
     if (!byMonth.has(month)) {
       byMonth.set(month, { month, INHOUSE: 0, CONSIGNMENT: 0, TRADING: 0, UNCLASSIFIED: 0 });
     }
@@ -388,8 +388,7 @@ export async function monthlyMarginMix(): Promise<MonthlyMargin[]> {
 
   const byMonth = new Map<string, MonthlyMargin>();
   for (const l of lines) {
-    const d = l.transaction.transactionDate;
-    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const month = monthKeyMYT(l.transaction.transactionDate);
     if (!byMonth.has(month)) byMonth.set(month, emptyMonthlyMargin(month));
     const row = byMonth.get(month)!;
     const bucket: SupplierBucket = l.product?.supplierType ?? "UNCLASSIFIED";
