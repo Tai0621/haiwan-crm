@@ -679,10 +679,13 @@ model ShiftLog {
 // ---------------------------------------------------------------------------
 model ShiftChecklistItem {
   id           String     @id @default(cuid())
-  section      String     // section title, e.g. "Entrance & windows"
-  sectionOrder Int        @default(0)
-  sortOrder    Int        @default(0)
-  shift        ShiftScope @default(BOTH)
+  section      String      // section title, e.g. "Entrance & windows"
+  sectionOrder Int         @default(0)
+  sortOrder    Int         @default(0)
+  shift        ShiftScope  @default(BOTH)
+  // Optional PJ override: when set, PJ uses this shift scope instead of `shift`
+  // (e.g. waste & bins is CLOSING-only in PJ but BOTH shifts in KL). Null = same.
+  pjShift      ShiftScope?
   label        String
   note         String?
   priority     String     @default("med") // "high" | "med" | "low"

@@ -27,6 +27,7 @@ export default async function ShiftPage() {
     sectionOrder: r.sectionOrder,
     sortOrder: r.sortOrder,
     shift: r.shift as Scope,
+    pjShift: r.pjShift as Scope | null,
     label: r.label,
     note: r.note,
     priority: r.priority as Priority,

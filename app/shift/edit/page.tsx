@@ -31,6 +31,16 @@ function PrioritySelect({ value }: { value?: Priority }) {
     </select>
   );
 }
+function PjShiftSelect({ value }: { value?: Scope | null }) {
+  return (
+    <select name="pjShift" defaultValue={value ?? ""} className={`${inp} w-full`} title="Override the shift for PJ only (e.g. waste at closing only)">
+      <option value="">PJ: same</option>
+      <option value="BOTH">PJ: both</option>
+      <option value="OPENING">PJ: opening</option>
+      <option value="CLOSING">PJ: closing</option>
+    </select>
+  );
+}
 
 export default async function EditChecklistPage() {
   const role = await currentRole();
@@ -74,6 +84,7 @@ export default async function EditChecklistPage() {
             <input name="note" placeholder="Extra instruction shown under the item" className={`${inp} w-full`} />
           </div>
           <div><label className={lbl}>Shift</label><ShiftSelect /></div>
+          <div><label className={lbl}>PJ shift</label><PjShiftSelect /></div>
           <div><label className={lbl}>Priority</label><PrioritySelect /></div>
           <div className="flex items-end gap-3 pb-1.5 sm:col-span-3">
             <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" name="storeKL" defaultChecked /> KL</label>
@@ -101,12 +112,13 @@ export default async function EditChecklistPage() {
                     <label className={lbl}>Label</label>
                     <input name="label" defaultValue={it.label} className={`${inp} w-full`} />
                   </div>
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-2">
                     <label className={lbl}>Note</label>
                     <input name="note" defaultValue={it.note ?? ""} className={`${inp} w-full`} />
                   </div>
                   <div className="sm:col-span-2"><label className={lbl}>Section</label><SectionSelect value={it.section} /></div>
                   <div className="sm:col-span-1"><label className={lbl}>Shift</label><ShiftSelect value={it.shift as Scope} /></div>
+                  <div className="sm:col-span-1"><label className={lbl}>PJ shift</label><PjShiftSelect value={it.pjShift as Scope | null} /></div>
                   <div className="sm:col-span-1"><label className={lbl}>Priority</label><PrioritySelect value={it.priority as Priority} /></div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:col-span-9">
                     <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" name="storeKL" defaultChecked={it.storeKL} /> KL</label>

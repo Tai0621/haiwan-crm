@@ -21,6 +21,7 @@ function parse(formData: FormData) {
     section,
     sectionOrder: SECTION_ORDER[section] ?? 50,
     shift: (String(formData.get("shift") ?? "BOTH") as Scope) || "BOTH",
+    pjShift: (String(formData.get("pjShift") ?? "") as Scope) || null,
     label: String(formData.get("label") ?? "").trim(),
     note: String(formData.get("note") ?? "").trim() || null,
     priority: String(formData.get("priority") ?? "med"),

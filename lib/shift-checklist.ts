@@ -22,7 +22,8 @@ export interface SopItem {
   section: string;
   sectionOrder: number;
   sortOrder: number;
-  shift: Scope;
+  shift: Scope; // shift scope for KL (and PJ, unless pjShift overrides)
+  pjShift: Scope | null; // PJ-only override; null = same as `shift`
   label: string;
   note: string | null;
   priority: Priority;
@@ -56,9 +57,11 @@ export const SCOPE_LABELS: Record<Scope, string> = { OPENING: "Opening only", CL
  * sectionOrder and items by sortOrder, and drops empty sections.
  */
 export function buildSections(items: SopItem[], shift: Shift, branch: Branch): ChecklistSection[] {
-  const relevant = items.filter(
-    (i) => (i.shift === shift || i.shift === "BOTH") && (branch === "KL" ? i.storeKL : i.storePJ),
-  );
+  const relevant = items.filter((i) => {
+    if (!(branch === "KL" ? i.storeKL : i.storePJ)) return false;
+    const scope = branch === "PJ" ? (i.pjShift ?? i.shift) : i.shift;
+    return scope === shift || scope === "BOTH";
+  });
   const bySection = new Map<string, { order: number; items: SopItem[] }>();
   for (const i of relevant) {
     if (!bySection.has(i.section)) bySection.set(i.section, { order: i.sectionOrder, items: [] });
@@ -86,13 +89,14 @@ export function defaultSopItems(): SeedItem[] {
     shift: Scope,
     label: string,
     priority: Priority,
-    opts: { note?: string; kl?: boolean; pj?: boolean } = {},
+    opts: { note?: string; kl?: boolean; pj?: boolean; pjShift?: Scope } = {},
   ) => {
     out.push({
       section,
       sectionOrder,
       sortOrder: out.filter((o) => o.section === section).length * 10,
       shift,
+      pjShift: opts.pjShift ?? null,
       label,
       note: opts.note ?? null,
       priority,
@@ -135,12 +139,13 @@ export function defaultSopItems(): SeedItem[] {
   add("Floors", 30, "BOTH", "Mop & bucket — rinsed, wrung, stored", "low", { pj: false });
   add("Floors", 30, "BOTH", "Electric mop — washed in the dock", "low", { kl: false, note: "Rinse the head and return it to the dock." });
 
-  // Waste & bins
-  add("Waste & bins", 40, "BOTH", "Empty all bins & reline", "high", { note: "Tie bag securely; fresh liner immediately." });
-  add("Waste & bins", 40, "BOTH", "Dispose of packaging waste & break down cardboard", "high");
-  add("Waste & bins", 40, "BOTH", "Wipe bin inside & out with disinfectant", "med");
-  add("Waste & bins", 40, "BOTH", "Check back-of-house / stockroom for waste", "med");
-  add("Waste & bins", 40, "BOTH", "Confirm waste taken to external collection point", "low", { note: "Nothing left inside overnight." });
+  // Waste & bins — PJ only handles this at closing (not the morning shift).
+  const waste = { pjShift: "CLOSING" as Scope };
+  add("Waste & bins", 40, "BOTH", "Empty all bins & reline", "high", { note: "Tie bag securely; fresh liner immediately.", ...waste });
+  add("Waste & bins", 40, "BOTH", "Dispose of packaging waste & break down cardboard", "high", { ...waste });
+  add("Waste & bins", 40, "BOTH", "Wipe bin inside & out with disinfectant", "med", { ...waste });
+  add("Waste & bins", 40, "BOTH", "Check back-of-house / stockroom for waste", "med", { ...waste });
+  add("Waste & bins", 40, "BOTH", "Confirm waste taken to external collection point", "low", { note: "Nothing left inside overnight.", ...waste });
 
   // Counter & till
   add("Counter & till", 50, "BOTH", "Counter surface — wiped clean & clutter-free", "high");
