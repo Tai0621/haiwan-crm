@@ -2,17 +2,22 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { AUTH_COOKIE, expectedToken } from "@/lib/auth";
+import { AUTH_COOKIE, expectedToken, expectedStaffToken } from "@/lib/auth";
 
 export async function login(formData: FormData) {
   const password = String(formData.get("password") ?? "");
-  const expected = process.env.APP_PASSWORD ?? "";
+  const mgmt = process.env.APP_PASSWORD ?? "";
+  const staff = process.env.APP_PASSWORD_STAFF ?? "";
 
-  if (!expected || password !== expected) {
+  // The password entered decides the role (management or frontline staff).
+  let token: string | null = null;
+  if (mgmt && password === mgmt) token = await expectedToken();
+  else if (staff && password === staff) token = await expectedStaffToken();
+
+  if (!token) {
     redirect("/login?error=1");
   }
 
-  const token = await expectedToken();
   const store = await cookies();
   store.set(AUTH_COOKIE, token, {
     httpOnly: true,

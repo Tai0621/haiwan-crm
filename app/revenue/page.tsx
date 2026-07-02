@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { monthlyRevenueMix, pct } from "@/lib/analytics";
 import { SUPPLIER_COLORS } from "@/lib/constants";
 import { rm } from "@/lib/format";
@@ -28,22 +29,30 @@ export default async function RevenuePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Revenue mix</h1>
-          {live && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              Live from StoreHub
-            </span>
-          )}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Revenue mix</h1>
+            {live && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Live from StoreHub
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-500">
+            The north-star chart: monthly revenue split by supplier type. The strategy is working
+            when the <span style={{ color: SUPPLIER_COLORS.INHOUSE }} className="font-medium">green
+            in-house</span> band grows and <span style={{ color: SUPPLIER_COLORS.TRADING }} className="font-medium">amber
+            trading</span> shrinks.
+          </p>
         </div>
-        <p className="text-sm text-slate-500">
-          The north-star chart: monthly revenue split by supplier type. The strategy is working
-          when the <span style={{ color: SUPPLIER_COLORS.INHOUSE }} className="font-medium">green
-          in-house</span> band grows and <span style={{ color: SUPPLIER_COLORS.TRADING }} className="font-medium">amber
-          trading</span> shrinks.
-        </p>
+        <Link
+          href="/finance"
+          className="shrink-0 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+        >
+          Analysis →
+        </Link>
       </div>
 
       {/* Lifetime split cards */}

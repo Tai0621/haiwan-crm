@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "./components/Nav";
+import { currentRole } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,18 +24,22 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Role drives which nav items render (frontline sees a limited set). Defaults
+  // to the most-restrictive role when unauthenticated (e.g. the /login screen,
+  // where Nav renders nothing anyway).
+  const role = (await currentRole()) ?? "frontline";
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex bg-slate-50 text-slate-900">
-        <Nav />
+        <Nav role={role} />
         <div className="flex min-w-0 flex-1 flex-col pt-14 md:pt-0">
           <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-4 sm:px-4 sm:py-6">{children}</main>
           <footer className="border-t border-slate-200 bg-white text-xs text-slate-500 py-3">

@@ -4,6 +4,7 @@ import { getInbox, sweepExpiredHolds, type InboxItem } from "@/lib/tasks";
 import { reconcileMemberships } from "@/lib/membership";
 import { reconcileSubscriptions, estimatedMrr } from "@/lib/subscriptions";
 import { reconcileBrandTrials } from "@/lib/brands";
+import { currentRole } from "@/lib/auth";
 import { rm } from "@/lib/format";
 import InboxRow from "@/app/components/InboxRow";
 import QuickAdd from "@/app/components/QuickAdd";
@@ -42,11 +43,14 @@ export default async function DashboardPage({
     reconcileBrandTrials(),
   ]);
 
-  const [all, activeSubs, mrr] = await Promise.all([
+  const [inbox, activeSubs, mrr, role] = await Promise.all([
     getInbox(), // unfiltered — drives counts + the available filter pills
     prisma.subscription.count({ where: { status: "ACTIVE" } }),
     estimatedMrr(),
+    currentRole(),
   ]);
+  // Frontline staff don't handle brand-trial reviews — hide them from their inbox.
+  const all = role === "frontline" ? inbox.filter((i) => i.type !== "BRAND_REVIEW") : inbox;
 
   const overdue = all.filter((i) => i.isOverdue).length;
   const presentTypes = Array.from(new Set(all.map((i) => i.type)));
