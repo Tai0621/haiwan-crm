@@ -12,11 +12,13 @@ const TABLES: Array<{ slug: string; label: string; desc: string }> = [
   { slug: "subscriptions", label: "Subscriptions", desc: "Recurring order intents" },
   { slug: "finance", label: "Finance (margin mix)", desc: "Monthly revenue / COGS / gross profit by supplier type" },
   { slug: "tasks", label: "Tasks", desc: "Action Inbox items — leads, holds, inquiries, follow-ups" },
+  { slug: "shiftlogs", label: "Shift sign-offs", desc: "Opening/closing checklist completions with remarks" },
+  { slug: "shiftchecklist", label: "Shift checklist items", desc: "The editable opening/closing SOP items" },
   { slug: "refilloverlays", label: "Refill overlays", desc: "Done/snooze state for computed refill predictions" },
 ];
 
 export default async function ExportPage() {
-  const [customers, pets, products, brands, transactions, lines, subscriptions, tasks, refilloverlays] =
+  const [customers, pets, products, brands, transactions, lines, subscriptions, tasks, refilloverlays, shiftlogs, shiftchecklist] =
     await Promise.all([
       prisma.customer.count(),
       prisma.pet.count(),
@@ -27,6 +29,8 @@ export default async function ExportPage() {
       prisma.subscription.count(),
       prisma.task.count(),
       prisma.refillOverlay.count(),
+      prisma.shiftLog.count(),
+      prisma.shiftChecklistItem.count(),
     ]);
   const counts: Record<string, number> = {
     customers,
@@ -38,6 +42,8 @@ export default async function ExportPage() {
     subscriptions,
     tasks,
     refilloverlays,
+    shiftlogs,
+    shiftchecklist,
   };
 
   return (

@@ -119,6 +119,19 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+// Opening vs closing shift (store readiness / cleanliness SOP).
+enum ShiftType {
+  OPENING
+  CLOSING
+}
+
+// Which shift(s) a checklist item applies to. BOTH = shared cleanliness item.
+enum ShiftScope {
+  OPENING
+  CLOSING
+  BOTH
+}
+
 // --- Supplier / consignment pipeline (Phase 4) -------------------------------
 
 // How Haiwan works with a brand partner. Extends the product SupplierType with
@@ -634,4 +647,50 @@ model AppSetting {
   id               String   @id @default("default")
   targetInhousePct Float    @default(0)
   updatedAt        DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// ShiftLog — a signed-off opening/closing store checklist (accountability
+// trail for "pass the baton clean"). One row per completed shift sign-off.
+// checkedItems is a JSON array of the checklist item ids that were ticked.
+// ---------------------------------------------------------------------------
+model ShiftLog {
+  id             String    @id @default(cuid())
+  shift          ShiftType
+  store          Store     @default(NONE)
+  businessDate   DateTime  // the date this shift is for
+  staffName      String
+  itemsTotal     Int
+  itemsDone      Int
+  checkedItems   String?   // JSON array of ticked item ids
+  remarks        String?
+  supervisorName String?
+  signedAt       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([businessDate])
+  @@index([shift])
+}
+
+// ---------------------------------------------------------------------------
+// ShiftChecklistItem — the editable opening/closing SOP (management edits it;
+// staff just complete it). One row per checklist line. Grouped by `section`,
+// ordered by sectionOrder then sortOrder; filtered per shift + branch at render.
+// ---------------------------------------------------------------------------
+model ShiftChecklistItem {
+  id           String     @id @default(cuid())
+  section      String     // section title, e.g. "Entrance & windows"
+  sectionOrder Int        @default(0)
+  sortOrder    Int        @default(0)
+  shift        ShiftScope @default(BOTH)
+  label        String
+  note         String?
+  priority     String     @default("med") // "high" | "med" | "low"
+  storeKL      Boolean    @default(true)
+  storePJ      Boolean    @default(true)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([active])
 }

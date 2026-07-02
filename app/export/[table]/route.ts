@@ -183,6 +183,40 @@ async function buildRows(table: string): Promise<Rows | null> {
       }
       return rows;
     }
+    case "shiftchecklist": {
+      const rows = await prisma.shiftChecklistItem.findMany({ orderBy: [{ sectionOrder: "asc" }, { sortOrder: "asc" }] });
+      return rows.map((i) => ({
+        id: i.id,
+        section: i.section,
+        sectionOrder: i.sectionOrder,
+        sortOrder: i.sortOrder,
+        shift: i.shift,
+        label: i.label,
+        note: i.note,
+        priority: i.priority,
+        storeKL: i.storeKL,
+        storePJ: i.storePJ,
+        active: i.active,
+        updatedAt: iso(i.updatedAt),
+      }));
+    }
+    case "shiftlogs": {
+      const rows = await prisma.shiftLog.findMany({ orderBy: { signedAt: "asc" } });
+      return rows.map((l) => ({
+        id: l.id,
+        shift: l.shift,
+        store: l.store,
+        businessDate: iso(l.businessDate),
+        staffName: l.staffName,
+        itemsTotal: l.itemsTotal,
+        itemsDone: l.itemsDone,
+        checkedItems: l.checkedItems,
+        remarks: l.remarks,
+        supervisorName: l.supervisorName,
+        signedAt: iso(l.signedAt),
+        createdAt: iso(l.createdAt),
+      }));
+    }
     case "refilloverlays": {
       const rows = await prisma.refillOverlay.findMany({ orderBy: { createdAt: "asc" } });
       return rows.map((o) => ({

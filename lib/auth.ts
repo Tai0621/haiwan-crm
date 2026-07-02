@@ -80,9 +80,11 @@ export async function requireManagement(): Promise<void> {
 // Frontline authorization — the pages a frontline session may reach. Everything
 // else is management-only. Used by the proxy (route gating) and the nav.
 // ---------------------------------------------------------------------------
-export const FRONTLINE_PREFIXES = ["/customers", "/pets", "/members", "/transactions"];
+export const FRONTLINE_PREFIXES = ["/shift", "/customers", "/pets", "/members", "/transactions"];
 
 export function frontlineCanAccess(pathname: string): boolean {
+  // The SOP editor is management-only, even though /shift itself is frontline.
+  if (pathname === "/shift/edit" || pathname.startsWith("/shift/edit/")) return false;
   if (pathname === "/") return true;
   return FRONTLINE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }

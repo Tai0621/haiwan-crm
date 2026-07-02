@@ -16,6 +16,9 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
   dashboard: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" /><rect x="14" y="12" width="7" height="9" /><rect x="3" y="16" width="7" height="5" /></svg>
   ),
+  checklist: ({ className = ic }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="m9 14 2 2 4-4" /></svg>
+  ),
   pets: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="4" r="2" /><circle cx="18" cy="8" r="2" /><circle cx="20" cy="16" r="2" /><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045l-.4-1.2a3.5 3.5 0 0 0-.83-1.32l-1.32-1.32A2 2 0 0 1 6.5 12.5l.7-.7A5 5 0 0 1 9 10Z" /></svg>
   ),
@@ -85,6 +88,7 @@ function isGroup(e: NavEntry): e is NavGroup {
 
 const ENTRIES: NavEntry[] = [
   { href: "/", label: "Inbox", icon: "dashboard" },
+  { href: "/shift", label: "Shift checklist", icon: "checklist" },
   {
     label: "Customers",
     icon: "customers",
@@ -125,7 +129,7 @@ const ENTRIES: NavEntry[] = [
 
 // Frontline staff only see these pages; management sees everything.
 type Role = "management" | "frontline";
-const FRONTLINE_HREFS = new Set(["/", "/customers", "/pets", "/members", "/transactions"]);
+const FRONTLINE_HREFS = new Set(["/", "/shift", "/customers", "/pets", "/members", "/transactions"]);
 
 function visibleEntries(role: Role): NavEntry[] {
   if (role === "management") return ENTRIES;

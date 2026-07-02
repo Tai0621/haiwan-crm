@@ -6,6 +6,7 @@
 
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "../app/generated/prisma/client";
+import { defaultSopItems } from "../lib/shift-checklist";
 import path from "path";
 import "dotenv/config";
 
@@ -666,10 +667,24 @@ async function main() {
     create: { id: "default", targetInhousePct: 40 },
   });
 
+  // Editable opening/closing SOP checklist — seed defaults if empty.
+  if ((await prisma.shiftChecklistItem.count()) === 0) {
+    await prisma.shiftChecklistItem.createMany({ data: defaultSopItems() });
+  }
+
+  // Sample shift sign-offs so the management log isn't empty.
+  await prisma.shiftLog.createMany({
+    data: [
+      { shift: "OPENING", store: "KL", businessDate: daysAgo(0), staffName: "Evi", itemsTotal: 34, itemsDone: 34, checkedItems: "[]", supervisorName: "Dini", signedAt: daysAgo(0) },
+      { shift: "CLOSING", store: "PJ", businessDate: daysAgo(1), staffName: "Win Nie", itemsTotal: 34, itemsDone: 31, checkedItems: "[]", remarks: "Left window corner needs a stronger cleaner. Bin liners low.", signedAt: daysAgo(1) },
+      { shift: "OPENING", store: "PJ", businessDate: daysAgo(1), staffName: "Jeany", itemsTotal: 34, itemsDone: 34, checkedItems: "[]", supervisorName: "Dannie", signedAt: daysAgo(1) },
+    ],
+  });
+
   console.log("✓ Seed complete.");
   console.log(`  Customers: 15 | Pets: 20 | Products: ${products.length} | Subscriptions: 5 | Tasks: 4 | Members activated: ${activated} | Brands: ${brandCount}`);
 }
 
 main()
-  .then(async () => { await prisma.$disconnect(); process.exit(0); })
-  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
+  .then(() => process.exit(0))
+  .catch((e) => { console.error(e); process.exit(1); });
