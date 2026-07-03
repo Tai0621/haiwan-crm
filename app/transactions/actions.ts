@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { rm, fmtDate } from "@/lib/format";
 import { STORE_LABELS } from "@/lib/constants";
+import { recordSaleDeductions } from "@/lib/inventory";
 
 // ---------------------------------------------------------------------------
 // Transaction actions — manual entry of in-store sales that aren't covered by
@@ -81,7 +82,7 @@ export async function createTransaction(formData: FormData) {
   const totalAmount =
     Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
 
-  await prisma.transaction.create({
+  const created = await prisma.transaction.create({
     data: {
       customerId,
       store,
@@ -92,8 +93,12 @@ export async function createTransaction(formData: FormData) {
     },
   });
 
+  // Inventory: deduct the sold store's stock (idempotent + fail-safe).
+  await recordSaleDeductions(created.id);
+
   revalidatePath("/");
   revalidatePath("/transactions");
+  revalidatePath("/inventory");
   revalidatePath("/customers");
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/revenue");

@@ -667,6 +667,41 @@ async function main() {
     create: { id: "default", targetInhousePct: 40 },
   });
 
+  // -------------------------------------------------------------------------
+  // Inventory — opening stock per store (ledger-backed) + a sample pending
+  // stock update so the review flow is visible. Only on a fresh database.
+  // -------------------------------------------------------------------------
+  if ((await prisma.stockMovement.count()) === 0) {
+    let i = 0;
+    for (const p of products) {
+      // Deterministic spread: consumables get more stock; one product left at 0.
+      const kl = i % 7 === 3 ? 2 : 6 + ((i * 3) % 9);
+      const pj = i % 11 === 5 ? 0 : 4 + ((i * 5) % 7);
+      await prisma.product.update({ where: { id: p.id }, data: { stockKL: kl, stockPJ: pj } });
+      await prisma.stockMovement.createMany({
+        data: [
+          { productId: p.id, store: "KL", delta: kl, type: "ADJUSTMENT", source: "SYSTEM", note: "Opening stock (seed)" },
+          { productId: p.id, store: "PJ", delta: pj, type: "ADJUSTMENT", source: "SYSTEM", note: "Opening stock (seed)" },
+        ],
+      });
+      i++;
+    }
+
+    await prisma.stockUpdate.create({
+      data: {
+        source: "WHATSAPP",
+        phone: "60123456789",
+        rawText: "Restock PJ: Ziwi Peak lamb 1kg x12, Royal Canin Kitten 2kg x6\nTransfer 3 tofu litter KL to PJ",
+        summary: "Restock at PJ (2 products) + 1 transfer KL→PJ",
+        itemsJson: JSON.stringify([
+          { action: "restock", productName: zw_dry_001.name, productId: zw_dry_001.id, qty: 12, store: "PJ" },
+          { action: "restock", productName: rc_kit_001.name, productId: rc_kit_001.id, qty: 6, store: "PJ" },
+          { action: "transfer", productName: hw_lt_001.name, productId: hw_lt_001.id, qty: 3, fromStore: "KL", toStore: "PJ" },
+        ]),
+      },
+    });
+  }
+
   // Editable opening/closing SOP checklist — seed defaults if empty.
   if ((await prisma.shiftChecklistItem.count()) === 0) {
     await prisma.shiftChecklistItem.createMany({ data: defaultSopItems() });

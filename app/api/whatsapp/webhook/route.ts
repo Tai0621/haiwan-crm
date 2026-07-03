@@ -23,6 +23,7 @@ import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { parseCloudApiWebhook } from "@/lib/whatsapp/cloud-api";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
+import { parseStockMessage, looksLikeStockMessage } from "@/lib/stock-agent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // needs node:crypto + Prisma/libsql (not Edge)
@@ -69,6 +70,15 @@ export async function POST(request: NextRequest) {
   try {
     const messages = parseCloudApiWebhook(payload);
     if (messages.length) await ingestMessages(messages, "CLOUD_API");
+
+    // Stock agent: staff messages starting with RESTOCK / TRANSFER / STOCK are
+    // inventory instructions — parse each into a pending update on /inventory.
+    for (const m of messages) {
+      if (m.direction === "INBOUND" && looksLikeStockMessage(m.body)) {
+        const r = await parseStockMessage(m.body, "WHATSAPP", m.phone);
+        if (!r.ok) console.error("Stock agent parse failed:", r.error);
+      }
+    }
   } catch (e) {
     // Log but still ack: Meta retries aggressively on any non-2xx response.
     console.error("WhatsApp Cloud API webhook error:", e);

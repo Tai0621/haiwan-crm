@@ -383,6 +383,7 @@ model Product {
   subscriptions Subscription[]
   tasks         Task[]
   refillOverlays RefillOverlay[]
+  stockMovements StockMovement[]
 
   @@index([brandId])
 }
@@ -644,9 +645,11 @@ model Brand {
 // Phase 5: targetInhousePct is leadership's goal for the in-house revenue share.
 // ---------------------------------------------------------------------------
 model AppSetting {
-  id               String   @id @default("default")
-  targetInhousePct Float    @default(0)
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default("default")
+  targetInhousePct  Float    @default(0)
+  // Inventory: highlight a product when a store's count falls to/below this.
+  lowStockThreshold Int      @default(5)
+  updatedAt         DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -696,4 +699,71 @@ model ShiftChecklistItem {
   updatedAt    DateTime   @updatedAt
 
   @@index([active])
+}
+
+// ---------------------------------------------------------------------------
+// Inventory (centralized per-store stock) ------------------------------------
+// Product.stockKL / stockPJ are the LIVE per-store counts, driven by the
+// StockMovement ledger below (every change is a signed row). New sales deduct
+// automatically; restocks/transfers arrive via the WhatsApp stock agent or the
+// manual forms on /inventory. Wix's single-pool figure stays as a reference.
+// ---------------------------------------------------------------------------
+
+enum StockMovementType {
+  RESTOCK     // goods in
+  TRANSFER    // between stores (two rows sharing groupId: -from / +to)
+  SALE        // deducted by a transaction line
+  ADJUSTMENT  // stock take / correction (set count)
+}
+
+enum StockSource {
+  WHATSAPP  // parsed from a WhatsApp message (live webhook)
+  PASTE     // parsed from a pasted message on /inventory
+  MANUAL    // quick form on /inventory
+  STOREHUB  // sale deduction from a synced/entered transaction
+  SYSTEM
+}
+
+enum StockUpdateStatus {
+  PENDING
+  APPLIED
+  DISMISSED
+}
+
+model StockMovement {
+  id            String            @id @default(cuid())
+  productId     String?
+  product       Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+  store         Store             // KL or PJ (never NONE)
+  delta         Int               // signed: + goods in, - goods out
+  type          StockMovementType
+  source        StockSource       @default(MANUAL)
+  groupId       String?           // pairs the two rows of a TRANSFER
+  note          String?
+  transactionId String?           // SALE: the transaction that deducted it
+  stockUpdateId String?           // WhatsApp/paste: the parsed update it came from
+  createdBy     String?
+  createdAt     DateTime          @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([transactionId])
+}
+
+// A parsed restock/transfer/stock-take message awaiting human review. Items are
+// matched to the catalog by the agent; Apply turns them into StockMovements.
+model StockUpdate {
+  id        String            @id @default(cuid())
+  source    StockSource       @default(PASTE) // WHATSAPP or PASTE
+  phone     String?           // sender, when it came via WhatsApp
+  rawText   String
+  summary   String?           // agent's one-line description
+  itemsJson String            // [{action, productId?, productName, qty, store?, fromStore?, toStore?, matched}]
+  status    StockUpdateStatus @default(PENDING)
+  error     String?
+  createdAt DateTime          @default(now())
+  appliedAt DateTime?
+  appliedBy String?
+
+  @@index([status])
 }

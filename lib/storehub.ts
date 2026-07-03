@@ -23,6 +23,7 @@ import { prisma } from "./db";
 import { normalizePhone } from "./phone";
 import { buildProductIndex, matchProduct } from "./match";
 import { findExistingCustomer, buildEnrichment } from "./customer-resolve";
+import { recordSaleDeductions } from "./inventory";
 
 const SH_BASE = "https://api.storehubhq.com";
 
@@ -281,7 +282,7 @@ export async function syncStoreHubTransactions(
         };
       });
 
-      await prisma.transaction.create({
+      const created = await prisma.transaction.create({
         data: {
           customerId,
           store: STORE_BY_ID[t.storeId] ?? "NONE",
@@ -293,6 +294,9 @@ export async function syncStoreHubTransactions(
         },
       });
       summary.created++;
+
+      // Inventory: deduct the sold store's stock (idempotent + fail-safe).
+      await recordSaleDeductions(created.id);
     }
 
     return { ok: true, ...summary };

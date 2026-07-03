@@ -200,6 +200,39 @@ async function buildRows(table: string): Promise<Rows | null> {
         updatedAt: iso(i.updatedAt),
       }));
     }
+    case "stockmovements": {
+      const rows = await prisma.stockMovement.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((m) => ({
+        id: m.id,
+        productId: m.productId,
+        store: m.store,
+        delta: m.delta,
+        type: m.type,
+        source: m.source,
+        groupId: m.groupId,
+        note: m.note,
+        transactionId: m.transactionId,
+        stockUpdateId: m.stockUpdateId,
+        createdBy: m.createdBy,
+        createdAt: iso(m.createdAt),
+      }));
+    }
+    case "stockupdates": {
+      const rows = await prisma.stockUpdate.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((u) => ({
+        id: u.id,
+        source: u.source,
+        phone: u.phone,
+        rawText: u.rawText,
+        summary: u.summary,
+        itemsJson: u.itemsJson,
+        status: u.status,
+        error: u.error,
+        createdAt: iso(u.createdAt),
+        appliedAt: iso(u.appliedAt),
+        appliedBy: u.appliedBy,
+      }));
+    }
     case "shiftlogs": {
       const rows = await prisma.shiftLog.findMany({ orderBy: { signedAt: "asc" } });
       return rows.map((l) => ({
