@@ -21,6 +21,8 @@ const TYPE_LABELS: Record<string, string> = {
   WINBACK: "Win-back",
   SUBSCRIPTION_DUE: "Subscription",
   BRAND_REVIEW: "Brand review",
+  DATA_ENRICH: "Missing name",
+  STOCK_CHECK: "Stock check",
   CUSTOM: "Task",
 };
 
@@ -33,6 +35,8 @@ const TYPE_STYLES: Record<string, string> = {
   WINBACK: "bg-rose-100 text-rose-700",
   SUBSCRIPTION_DUE: "bg-teal-100 text-teal-700",
   BRAND_REVIEW: "bg-indigo-100 text-indigo-700",
+  DATA_ENRICH: "bg-amber-100 text-amber-700",
+  STOCK_CHECK: "bg-orange-100 text-orange-700",
   CUSTOM: "bg-slate-100 text-slate-600",
 };
 
@@ -75,7 +79,9 @@ export default function InboxRow({ item }: { item: InboxItem }) {
             {TYPE_LABELS[item.type] ?? "Task"}
           </span>
           <span className="truncate font-medium text-slate-900">
-            {item.brandName ?? item.customerName ?? "Unnamed"}
+            {item.brandName ??
+              item.customerName ??
+              (item.type === "STOCK_CHECK" ? "Inventory" : "Unnamed")}
           </span>
           {item.petLabel && <span className="text-sm text-slate-500">· {item.petLabel}</span>}
           {item.customerPhone && (
@@ -126,6 +132,14 @@ export default function InboxRow({ item }: { item: InboxItem }) {
             className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
           >
             Open brand
+          </Link>
+        )}
+        {item.type === "STOCK_CHECK" && (
+          <Link
+            href="/inventory"
+            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Open inventory
           </Link>
         )}
 

@@ -208,6 +208,8 @@ enum TaskType {
   WINBACK           // re-engage a lapsed customer (Phase 2)
   SUBSCRIPTION_DUE  // a managed subscription due for its next cycle (Phase 3)
   BRAND_REVIEW      // a brand 90-day trial review (Phase 4)
+  DATA_ENRICH       // a paying customer/pet still missing a name — fill it in
+  STOCK_CHECK       // on-hand counts differ from Wix — verify physical stock
   CUSTOM            // anything staff types in manually
 }
 

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getInbox, sweepExpiredHolds, type InboxItem } from "@/lib/tasks";
+import { getInbox, sweepExpiredHolds, reconcileNaming, type InboxItem } from "@/lib/tasks";
 import { reconcileMemberships } from "@/lib/membership";
 import { reconcileSubscriptions, estimatedMrr } from "@/lib/subscriptions";
+import { reconcileStockDrift } from "@/lib/inventory";
 import { reconcileBrandTrials } from "@/lib/brands";
 import { currentRole } from "@/lib/auth";
 import { rm } from "@/lib/format";
@@ -41,6 +42,8 @@ export default async function DashboardPage({
     reconcileMemberships(),
     reconcileSubscriptions(),
     reconcileBrandTrials(),
+    reconcileNaming(),
+    reconcileStockDrift(),
   ]);
 
   const [inbox, activeSubs, mrr, role] = await Promise.all([

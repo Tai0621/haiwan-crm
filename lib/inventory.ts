@@ -420,3 +420,37 @@ export async function stockSummary(threshold: number): Promise<StockSummary> {
   }
   return { totalSkus: products.length, low, out, pendingUpdates };
 }
+
+// ---------------------------------------------------------------------------
+// Wix drift reconcile — Wix is a single-pool reference; when its number no
+// longer matches the CRM's on-hand (stockKL + stockPJ) for a product, the
+// physical count is worth a look. Rolled up into ONE STOCK_CHECK task (rather
+// than flooding the inbox per product), refreshed each run, auto-closed when
+// everything lines up. Runs on the dashboard load + eod cron.
+// ---------------------------------------------------------------------------
+export async function reconcileStockDrift(now: Date = new Date()): Promise<number> {
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT COUNT(*) as n FROM "Product" WHERE "wixStock" IS NOT NULL AND "wixStock" <> ("stockKL" + "stockPJ")`,
+  )) as { n: number | bigint }[];
+  const count = Number(rows[0]?.n ?? 0);
+
+  const existing = await prisma.task.findFirst({
+    where: { type: "STOCK_CHECK", source: "SYSTEM", status: { in: ["OPEN", "SNOOZED"] } },
+    select: { id: true, dueAt: true },
+  });
+
+  if (count === 0) {
+    if (existing) await prisma.task.update({ where: { id: existing.id }, data: { status: "DONE", completedAt: now } });
+    return 0;
+  }
+
+  const note = `${count} product${count > 1 ? "s" : ""} have on-hand counts that differ from Wix — check the physical stock and reconcile on the Inventory page.`;
+  if (existing) {
+    await prisma.task.update({ where: { id: existing.id }, data: { note } });
+  } else {
+    await prisma.task.create({
+      data: { type: "STOCK_CHECK", source: "SYSTEM", channel: "SYSTEM", dueAt: now, note },
+    });
+  }
+  return count;
+}

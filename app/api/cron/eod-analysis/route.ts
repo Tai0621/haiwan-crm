@@ -10,9 +10,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { runEodAnalysis } from "@/lib/whatsapp/analyze";
-import { sweepExpiredHolds } from "@/lib/tasks";
+import { sweepExpiredHolds, reconcileNaming } from "@/lib/tasks";
 import { reconcileMemberships } from "@/lib/membership";
 import { reconcileSubscriptions } from "@/lib/subscriptions";
+import { reconcileStockDrift } from "@/lib/inventory";
 import { reconcileBrandTrials } from "@/lib/brands";
 
 export const dynamic = "force-dynamic";

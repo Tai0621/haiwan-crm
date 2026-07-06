@@ -146,6 +146,10 @@ function reasonForTask(type: TaskType, holdItem: string | null, productName: str
       return `Subscription due: ${productName ?? "item"}`;
     case "BRAND_REVIEW":
       return "Brand 90-day trial review";
+    case "DATA_ENRICH":
+      return "Add missing name(s)";
+    case "STOCK_CHECK":
+      return "Check stock vs Wix";
     case "REFILL":
       return `Refill: ${productName ?? "consumable"}`;
     default:
@@ -191,7 +195,11 @@ function taskToItem(t: TaskRow, now: Date, brandName?: string): InboxItem {
     isOverdue: t.dueAt < now,
     holdExpiresAt: t.holdExpiresAt,
     status: t.status,
-    whatsappUrl: t.customer?.phone ? whatsappLink(t.customer.phone, text) : null,
+    // Internal data-entry tasks aren't customer outreach — no WhatsApp button.
+    whatsappUrl:
+      t.customer?.phone && t.type !== "DATA_ENRICH" && t.type !== "STOCK_CHECK"
+        ? whatsappLink(t.customer.phone, text)
+        : null,
     brandId: t.brandId ?? undefined,
     brandName,
   };
@@ -357,4 +365,62 @@ export async function inboxCounts(): Promise<{ total: number; overdue: number }>
     total: items.length,
     overdue: items.filter((i) => i.isOverdue).length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Data-enrichment reconcile — a paying customer (or their pet) that's still
+// unnamed becomes a DATA_ENRICH task so staff capture the name. Runs on the
+// dashboard load + eod cron; the candidate query is DB-filtered so it returns
+// only the few rows that need attention. Self-heals: once named, the open task
+// is auto-completed.
+// ---------------------------------------------------------------------------
+const isBlank = (s: string | null | undefined) => !s || s.trim() === "";
+
+export async function reconcileNaming(now: Date = new Date()): Promise<number> {
+  const candidates = await prisma.customer.findMany({
+    where: {
+      transactions: { some: {} },
+      OR: [{ name: null }, { name: "" }, { pets: { some: { name: "" } } }],
+    },
+    select: { id: true, name: true, pets: { select: { name: true } } },
+  });
+  const need = candidates.filter((c) => isBlank(c.name) || c.pets.some((p) => isBlank(p.name)));
+  const needIds = new Set(need.map((c) => c.id));
+
+  let created = 0;
+  for (const c of need) {
+    const existing = await prisma.task.findFirst({
+      where: { customerId: c.id, type: "DATA_ENRICH", status: { in: ["OPEN", "SNOOZED"] } },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    const bits: string[] = [];
+    if (isBlank(c.name)) bits.push("customer name");
+    const unnamedPets = c.pets.filter((p) => isBlank(p.name)).length;
+    if (unnamedPets) bits.push(`${unnamedPets} pet name${unnamedPets > 1 ? "s" : ""}`);
+    await prisma.task.create({
+      data: {
+        type: "DATA_ENRICH",
+        source: "SYSTEM",
+        channel: "SYSTEM",
+        customerId: c.id,
+        dueAt: now,
+        note: `Fill in the ${bits.join(" and ")} — they've purchased, so it's worth capturing.`,
+      },
+    });
+    created++;
+  }
+
+  // Auto-close enrichment tasks whose customer no longer needs naming.
+  const open = await prisma.task.findMany({
+    where: { type: "DATA_ENRICH", status: "OPEN", customerId: { not: null } },
+    select: { id: true, customerId: true },
+  });
+  for (const t of open) {
+    if (!needIds.has(t.customerId!)) {
+      await prisma.task.update({ where: { id: t.id }, data: { status: "DONE", completedAt: now } });
+    }
+  }
+  return created;
 }
