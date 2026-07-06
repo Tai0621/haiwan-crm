@@ -764,6 +764,28 @@ model StockUpdate {
   createdAt DateTime          @default(now())
   appliedAt DateTime?
   appliedBy String?
+  // Receive & check: who physically counted the goods against the list, when.
+  verifiedBy String?
+  verifiedAt DateTime?
 
   @@index([status])
+}
+
+// A variance found while receiving goods against a restock list: staff counted
+// a different quantity than the list claimed. Stock is updated with the COUNTED
+// number; this row is the paper trail (and feeds a follow-up task + the
+// management discrepancies log on /inventory).
+model StockDiscrepancy {
+  id            String   @id @default(cuid())
+  stockUpdateId String
+  productId     String?
+  productName   String
+  store         Store
+  expected      Int
+  received      Int
+  note          String?
+  checkedBy     String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
 }

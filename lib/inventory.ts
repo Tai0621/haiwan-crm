@@ -25,6 +25,10 @@ export interface StockUpdateItem {
   store?: StockStore | null; // restock & set
   fromStore?: StockStore | null; // transfer
   toStore?: StockStore | null;
+  // Receive & check (restock lines): what staff physically counted, and any
+  // per-line remark ("2 bags damaged"). Stock is updated with receivedQty.
+  receivedQty?: number | null;
+  checkNote?: string | null;
 }
 
 interface MovementInput {
@@ -262,6 +266,128 @@ export async function applyStockUpdate(id: string, appliedBy?: string | null): P
     where: { id },
     data: { status: "APPLIED", appliedAt: new Date(), appliedBy: appliedBy ?? null, error: null },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Receive & check — apply a restock-bearing update with PHYSICALLY COUNTED
+// quantities. Counted numbers win (stock reflects reality); any variance from
+// the list is recorded as a StockDiscrepancy and rolled into one follow-up
+// task in the Action Inbox so someone chases the supplier.
+// ---------------------------------------------------------------------------
+
+export interface ReceivedCount {
+  index: number; // position in the update's items array (restock lines only)
+  receivedQty: number;
+  note?: string | null;
+}
+
+export async function verifyAndApplyStockUpdate(
+  id: string,
+  counts: ReceivedCount[],
+  checkedBy: string,
+): Promise<{ discrepancies: number }> {
+  const update = await prisma.stockUpdate.findUnique({ where: { id } });
+  if (!update) throw new Error("Update not found.");
+  if (update.status !== "PENDING") throw new Error("This update was already handled.");
+  const who = checkedBy.trim();
+  if (!who) throw new Error("Enter who checked the goods.");
+
+  const items = parseItems(update.itemsJson);
+  const problems = updateProblems(items);
+  if (problems.length) {
+    await prisma.stockUpdate.update({ where: { id }, data: { error: problems.join(" ") } });
+    throw new Error(problems.join(" "));
+  }
+
+  // Merge the counted quantities into the restock lines (default = as listed).
+  const byIndex = new Map(counts.map((c) => [c.index, c]));
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (it.action !== "restock") continue;
+    const c = byIndex.get(i);
+    const received = c ? Math.round(c.receivedQty) : it.qty;
+    if (!Number.isFinite(received) || received < 0) throw new Error(`Item ${i + 1}: counted quantity must be 0 or more.`);
+    it.receivedQty = received;
+    it.checkNote = c?.note?.trim() || null;
+  }
+
+  const source = update.source === "WHATSAPP" ? "WHATSAPP" : "PASTE";
+  const now = new Date();
+  const discrepancies: { productId: string; productName: string; store: StockStore; expected: number; received: number; note: string | null }[] = [];
+
+  for (const it of items) {
+    const baseNote = update.summary ?? "Stock update";
+    if (it.action === "restock") {
+      const received = it.receivedQty ?? it.qty;
+      const varies = received !== it.qty;
+      if (varies) {
+        discrepancies.push({
+          productId: it.productId!,
+          productName: it.productName,
+          store: it.store as StockStore,
+          expected: it.qty,
+          received,
+          note: it.checkNote ?? null,
+        });
+      }
+      if (received > 0) {
+        await restock(it.productId!, it.store as StockStore, received, {
+          source,
+          stockUpdateId: id,
+          by: who,
+          note: varies ? `${baseNote} — verified: listed ${it.qty}, counted ${received}` : `${baseNote} — verified`,
+        });
+      }
+    } else if (it.action === "transfer") {
+      await transfer(it.productId!, it.fromStore as StockStore, it.toStore as StockStore, it.qty, { source, stockUpdateId: id, note: baseNote, by: who });
+    } else {
+      await setCount(it.productId!, it.store as StockStore, it.qty, { source, stockUpdateId: id, note: baseNote, by: who });
+    }
+  }
+
+  if (discrepancies.length) {
+    await prisma.stockDiscrepancy.createMany({
+      data: discrepancies.map((d) => ({
+        stockUpdateId: id,
+        productId: d.productId,
+        productName: d.productName,
+        store: d.store as Store,
+        expected: d.expected,
+        received: d.received,
+        note: d.note,
+        checkedBy: who,
+      })),
+    });
+    // One follow-up task per delivery, listing every variance.
+    const lines = discrepancies
+      .map((d) => `${d.productName}: listed ${d.expected}, received ${d.received}${d.note ? ` (${d.note})` : ""}`)
+      .join("; ");
+    await prisma.task.create({
+      data: {
+        type: "CUSTOM",
+        source: "SYSTEM",
+        channel: "SYSTEM",
+        store: discrepancies[0].store as Store,
+        dueAt: now,
+        note: `Delivery discrepancy — follow up with supplier. ${lines}`,
+      },
+    });
+  }
+
+  await prisma.stockUpdate.update({
+    where: { id },
+    data: {
+      itemsJson: JSON.stringify(items),
+      status: "APPLIED",
+      appliedAt: now,
+      appliedBy: who,
+      verifiedBy: who,
+      verifiedAt: now,
+      error: null,
+    },
+  });
+
+  return { discrepancies: discrepancies.length };
 }
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,15 @@
 
 import { prisma } from "@/lib/db";
 import { isAuthenticated, requireManagement } from "@/lib/auth";
-import { restock, transfer, setCount, applyStockUpdate, type StockStore } from "@/lib/inventory";
+import {
+  restock,
+  transfer,
+  setCount,
+  applyStockUpdate,
+  verifyAndApplyStockUpdate,
+  type StockStore,
+  type ReceivedCount,
+} from "@/lib/inventory";
 import { parseStockMessage, type ParseResult } from "@/lib/stock-agent";
 import { buildProductIndex, matchProduct } from "@/lib/match";
 import { revalidatePath } from "next/cache";
@@ -55,6 +63,23 @@ export async function applyUpdate(formData: FormData) {
   if (!id) throw new Error("Missing update id.");
   await applyStockUpdate(id);
   refresh();
+}
+
+/** Receive & check: apply a restock-bearing update with counted quantities. */
+export async function receiveAndApply(
+  id: string,
+  counts: ReceivedCount[],
+  checkedBy: string,
+): Promise<{ ok: boolean; discrepancies?: number; error?: string }> {
+  await requireSession();
+  try {
+    const r = await verifyAndApplyStockUpdate(id, counts, checkedBy);
+    refresh();
+    revalidatePath("/"); // a discrepancy may have spawned an inbox task
+    return { ok: true, discrepancies: r.discrepancies };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 export async function dismissUpdate(formData: FormData) {

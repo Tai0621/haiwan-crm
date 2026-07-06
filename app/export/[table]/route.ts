@@ -233,6 +233,22 @@ async function buildRows(table: string): Promise<Rows | null> {
         appliedBy: u.appliedBy,
       }));
     }
+    case "stockdiscrepancies": {
+      const rows = await prisma.stockDiscrepancy.findMany({ orderBy: { createdAt: "asc" } });
+      return rows.map((d) => ({
+        id: d.id,
+        stockUpdateId: d.stockUpdateId,
+        productId: d.productId,
+        productName: d.productName,
+        store: d.store,
+        expected: d.expected,
+        received: d.received,
+        variance: d.received - d.expected,
+        note: d.note,
+        checkedBy: d.checkedBy,
+        createdAt: iso(d.createdAt),
+      }));
+    }
     case "shiftlogs": {
       const rows = await prisma.shiftLog.findMany({ orderBy: { signedAt: "asc" } });
       return rows.map((l) => ({

@@ -14,13 +14,14 @@ const TABLES: Array<{ slug: string; label: string; desc: string }> = [
   { slug: "tasks", label: "Tasks", desc: "Action Inbox items — leads, holds, inquiries, follow-ups" },
   { slug: "stockmovements", label: "Stock movements", desc: "Inventory ledger — every restock, transfer, sale, adjustment" },
   { slug: "stockupdates", label: "Stock updates", desc: "Parsed WhatsApp/pasted stock messages and their status" },
+  { slug: "stockdiscrepancies", label: "Receiving discrepancies", desc: "Physical count vs restock list variances" },
   { slug: "shiftlogs", label: "Shift sign-offs", desc: "Opening/closing checklist completions with remarks" },
   { slug: "shiftchecklist", label: "Shift checklist items", desc: "The editable opening/closing SOP items" },
   { slug: "refilloverlays", label: "Refill overlays", desc: "Done/snooze state for computed refill predictions" },
 ];
 
 export default async function ExportPage() {
-  const [customers, pets, products, brands, transactions, lines, subscriptions, tasks, refilloverlays, shiftlogs, shiftchecklist, stockmovements, stockupdates] =
+  const [customers, pets, products, brands, transactions, lines, subscriptions, tasks, refilloverlays, shiftlogs, shiftchecklist, stockmovements, stockupdates, stockdiscrepancies] =
     await Promise.all([
       prisma.customer.count(),
       prisma.pet.count(),
@@ -35,6 +36,7 @@ export default async function ExportPage() {
       prisma.shiftChecklistItem.count(),
       prisma.stockMovement.count(),
       prisma.stockUpdate.count(),
+      prisma.stockDiscrepancy.count(),
     ]);
   const counts: Record<string, number> = {
     customers,
@@ -50,6 +52,7 @@ export default async function ExportPage() {
     shiftchecklist,
     stockmovements,
     stockupdates,
+    stockdiscrepancies,
   };
 
   return (
