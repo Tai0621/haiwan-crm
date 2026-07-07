@@ -10,6 +10,8 @@ import { inboxForCustomer } from "@/lib/tasks";
 import { memberView } from "@/lib/membership";
 import { claimMembershipAction, adjustPoints } from "@/app/actions/membership";
 import InboxRow from "@/app/components/InboxRow";
+import JourneyCard from "@/app/components/JourneyCard";
+import { journeyForCustomer, recommendationsForCustomer } from "@/lib/journey";
 import { marginMixForCustomer, pct } from "@/lib/analytics";
 import { formatPhoneDisplay, whatsappLink } from "@/lib/phone";
 import { fmtDate, fmtDateTime, rm } from "@/lib/format";
@@ -32,7 +34,7 @@ export default async function CustomerDetailPage({
 
   // These three reads are independent — run them in parallel so the page waits
   // on one round trip to the DB, not three back-to-back.
-  const [customer, predictions, mix, actions, member, activeSubs] = await Promise.all([
+  const [customer, predictions, mix, actions, member, activeSubs, journey] = await Promise.all([
     prisma.customer.findUnique({
       where: { id },
       include: {
@@ -55,9 +57,13 @@ export default async function CustomerDetailPage({
     inboxForCustomer(id),
     memberView(id),
     prisma.subscription.findMany({ where: { customerId: id, status: "ACTIVE" }, select: { productId: true } }),
+    journeyForCustomer(id),
   ]);
 
   if (!customer) notFound();
+
+  // Recommendations need the journey profile, so they run after the batch.
+  const recommendations = await recommendationsForCustomer(id, journey);
 
   // A product managed by an active subscription is no longer a manual refill.
   const subscribedProductIds = new Set(activeSubs.map((s) => s.productId));
@@ -252,6 +258,9 @@ export default async function CustomerDetailPage({
         <h2 className="text-lg font-semibold mb-3">Pets ({customer.pets.length})</h2>
         <PetManager customerId={id} pets={customer.pets} />
       </div>
+
+      {/* Purchase journey heatmap + gap recommendations */}
+      <JourneyCard profile={journey} recommendations={recommendations} />
 
       {/* Refill predictions + margin mix side by side */}
       <div className="grid md:grid-cols-2 gap-6">
