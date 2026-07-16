@@ -645,6 +645,10 @@ model Brand {
   listingFeeMonthly Float?                   // monthly listing fee (native ccy)
   adSpendMonthly    Float?                   // monthly committed ad spend (native ccy)
   vendorMarkup      Float?                   // RRP = markup x cost (COGS% = 1/markup); null = use default
+  // Target/expected avg RRP per unit (RM) — the partner's intended sales-mix
+  // weighting. Used for breakeven units/day BEFORE any sales exist; once real
+  // sell-through arrives the sales-weighted actual avg takes over.
+  expectedAvgRrp    Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

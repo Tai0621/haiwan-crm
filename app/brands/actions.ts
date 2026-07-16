@@ -45,6 +45,7 @@ function fields(formData: FormData) {
     listingFeeMonthly: num("listingFeeMonthly"),
     adSpendMonthly: num("adSpendMonthly"),
     vendorMarkup: num("vendorMarkup"),
+    expectedAvgRrp: num("expectedAvgRrp"),
   };
 }
 

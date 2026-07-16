@@ -112,8 +112,11 @@ export default function BreakevenCard({ b }: { b: BrandBreakeven }) {
           {b.avgRrpBasis === "sales-weighted" ? " · avg RRP is sales-weighted from real sell-through" : ""}.
         </p>
       )}
+      {b.actualUnits === 0 && b.avgRrpBasis === "expected" && (
+        <p className="mt-3 text-xs text-slate-400">Avg RRP is the partner&apos;s target mix (no sales yet) — swaps to sales-weighted once sell-through arrives.</p>
+      )}
       {b.actualUnits === 0 && b.avgRrpBasis === "catalog-average" && (
-        <p className="mt-3 text-xs text-slate-400">Avg RRP is a catalog average (no sales yet to weight by).</p>
+        <p className="mt-3 text-xs text-slate-400">Avg RRP is a plain catalog average — set a target avg RRP on the brand for a mix-weighted figure.</p>
       )}
 
       {/* Charts */}

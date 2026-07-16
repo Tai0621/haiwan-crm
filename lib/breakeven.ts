@@ -157,7 +157,7 @@ export interface BrandBreakeven extends BreakevenResult {
   actualUnits: number;
   actualRevenue: number;
   monthsActive: number;
-  avgRrpBasis: "sales-weighted" | "catalog-average" | "none";
+  avgRrpBasis: "sales-weighted" | "expected" | "catalog-average" | "none";
   monthly: Array<{ month: string; rrp: number }>; // last 12 MYT months of RRP sales
 }
 
@@ -204,12 +204,17 @@ export async function brandBreakeven(
   }
   const monthly = monthKeys.map((month, i) => ({ month, rrp: monthRrp[i] }));
 
-  // Avg RRP: sales-weighted realized price when we have sales, else catalog mean.
+  // Avg RRP: sales-weighted realized price once we have sales; before that, the
+  // partner's own target avg RRP (their intended sales mix) if set; else a plain
+  // catalog mean as a last resort.
   let avgRrp: number | null = null;
   let avgRrpBasis: BrandBreakeven["avgRrpBasis"] = "none";
   if (actualUnits > 0) {
     avgRrp = actualRevenue / actualUnits;
     avgRrpBasis = "sales-weighted";
+  } else if (brand.expectedAvgRrp != null && brand.expectedAvgRrp > 0) {
+    avgRrp = brand.expectedAvgRrp;
+    avgRrpBasis = "expected";
   } else if (catalogPrices.length > 0) {
     avgRrp = catalogPrices.reduce((s, v) => s + v, 0) / catalogPrices.length;
     avgRrpBasis = "catalog-average";

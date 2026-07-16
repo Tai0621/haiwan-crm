@@ -198,6 +198,7 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
           <div><label className={label}>Listing fee / mth (native)</label><input name="listingFeeMonthly" type="number" step="0.01" defaultValue={brand.listingFeeMonthly ?? ""} className={input} /></div>
           <div><label className={label}>Ad spend / mth (native)</label><input name="adSpendMonthly" type="number" step="0.01" defaultValue={brand.adSpendMonthly ?? ""} className={input} /></div>
           <div><label className={label}>Vendor markup (×cost)</label><input name="vendorMarkup" type="number" step="0.1" placeholder="default 3" defaultValue={brand.vendorMarkup ?? ""} className={input} /></div>
+          <div><label className={label}>Target avg RRP / unit (RM)</label><input name="expectedAvgRrp" type="number" step="0.01" placeholder="until sales exist" defaultValue={brand.expectedAvgRrp ?? ""} className={input} /></div>
           <div className="sm:col-span-3"><label className={label}>Next step</label><input name="nextStep" defaultValue={brand.nextStep ?? ""} className={input} /></div>
           <div className="sm:col-span-3"><label className={label}>Notes</label><textarea name="notes" defaultValue={brand.notes ?? ""} className={input} rows={2} /></div>
           <div className="sm:col-span-3">
