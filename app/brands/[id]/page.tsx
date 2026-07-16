@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { brandDetail, TRIAL_WINDOW_DAYS } from "@/lib/brands";
+import { brandBreakeven } from "@/lib/breakeven";
 import { updateBrand } from "../actions";
 import { rm } from "@/lib/format";
+import BreakevenCard from "./BreakevenCard";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,7 @@ const label = "block text-xs font-medium text-slate-500 mb-1";
 
 export default async function BrandDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const detail = await brandDetail(id);
+  const [detail, breakeven] = await Promise.all([brandDetail(id), brandBreakeven(id)]);
   if (!detail) notFound();
   const { brand, trialDay, products, metrics } = detail;
 
@@ -62,6 +64,9 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
         {brand.nextStep && <p className="mt-3 text-sm text-slate-600"><span className="text-slate-400">Next step:</span> {brand.nextStep}</p>}
         {brand.notes && <p className="mt-1 text-sm text-slate-600 whitespace-pre-wrap">{brand.notes}</p>}
       </div>
+
+      {/* Partner breakeven KPI */}
+      {breakeven && <BreakevenCard b={breakeven} />}
 
       {/* Trial metrics */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -179,8 +184,20 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
           <div><label className={label}>Country</label><input name="country" defaultValue={brand.country ?? ""} className={input} /></div>
           <div><label className={label}>Website</label><input name="website" defaultValue={brand.website ?? ""} className={input} /></div>
           <div><label className={label}>Trial start</label><input name="trialStartDate" type="date" defaultValue={isoDate(brand.trialStartDate)} className={input} /></div>
-          <div><label className={label}>Listing fee (RM)</label><input name="listingFee" type="number" step="0.01" defaultValue={brand.listingFee ?? ""} className={input} /></div>
+          <div><label className={label}>Listing fee (RM, upfront)</label><input name="listingFee" type="number" step="0.01" defaultValue={brand.listingFee ?? ""} className={input} /></div>
           <div><label className={label}>Commission %</label><input name="commissionPct" type="number" step="0.1" defaultValue={brand.commissionPct ?? ""} className={input} /></div>
+          <div className="sm:col-span-3 mt-1 border-t border-slate-100 pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Partner breakeven inputs</p>
+          </div>
+          <div>
+            <label className={label}>Fee currency</label>
+            <select name="feeCurrency" defaultValue={brand.feeCurrency ?? "MYR"} className={input}>
+              {["MYR", "USD", "SGD"].map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div><label className={label}>Listing fee / mth (native)</label><input name="listingFeeMonthly" type="number" step="0.01" defaultValue={brand.listingFeeMonthly ?? ""} className={input} /></div>
+          <div><label className={label}>Ad spend / mth (native)</label><input name="adSpendMonthly" type="number" step="0.01" defaultValue={brand.adSpendMonthly ?? ""} className={input} /></div>
+          <div><label className={label}>Vendor markup (×cost)</label><input name="vendorMarkup" type="number" step="0.1" placeholder="default 3" defaultValue={brand.vendorMarkup ?? ""} className={input} /></div>
           <div className="sm:col-span-3"><label className={label}>Next step</label><input name="nextStep" defaultValue={brand.nextStep ?? ""} className={input} /></div>
           <div className="sm:col-span-3"><label className={label}>Notes</label><textarea name="notes" defaultValue={brand.notes ?? ""} className={input} rows={2} /></div>
           <div className="sm:col-span-3">

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { brandList, TRIAL_WINDOW_DAYS, reconcileBrandTrials, type BrandListRow } from "@/lib/brands";
 import { productAnalysis } from "@/lib/analytics";
-import { setBrandStatus } from "./actions";
+import { getAssumptions } from "@/lib/breakeven";
+import { setBrandStatus, updateBreakevenAssumptions } from "./actions";
 import NewBrandForm from "./NewBrandForm";
 import { rm } from "@/lib/format";
 
@@ -28,7 +29,8 @@ const NEXT_STATUS: Record<string, string | null> = {
 
 export default async function BrandsPage() {
   await reconcileBrandTrials();
-  const [brands, candidates] = await Promise.all([brandList(), productAnalysis()]);
+  const [brands, candidates, assumptions] = await Promise.all([brandList(), productAnalysis(), getAssumptions()]);
+  const aInput = "w-24 rounded-md border border-slate-200 px-2 py-1 text-sm";
 
   const byStatus = new Map<string, BrandListRow[]>();
   for (const b of brands) {
@@ -45,6 +47,34 @@ export default async function BrandsPage() {
         </div>
         <NewBrandForm />
       </div>
+
+      {/* Breakeven assumptions — drive the per-partner viability KPI. */}
+      <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer text-sm font-medium text-slate-700">
+          Breakeven assumptions
+          <span className="ml-2 text-xs font-normal text-slate-400">
+            USD {assumptions.fxUsdMyr} · SGD {assumptions.fxSgdMyr} · {assumptions.defaultMarkup}× markup
+          </span>
+        </summary>
+        <form action={updateBreakevenAssumptions} className="mt-3 flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">USD → MYR</label>
+            <input name="fxUsdMyr" type="number" step="0.01" defaultValue={assumptions.fxUsdMyr} className={aInput} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">SGD → MYR</label>
+            <input name="fxSgdMyr" type="number" step="0.01" defaultValue={assumptions.fxSgdMyr} className={aInput} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Default markup (×cost)</label>
+            <input name="defaultVendorMarkup" type="number" step="0.1" defaultValue={assumptions.defaultMarkup} className={aInput} />
+          </div>
+          <button className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">Save</button>
+          <p className="w-full text-xs text-slate-400">
+            FX converts each partner&apos;s native fees to RM. Markup sets COGS as a share of RRP (COGS% = 1 ÷ markup) when a brand hasn&apos;t set its own.
+          </p>
+        </form>
+      </details>
 
       {STATUS_ORDER.map((status) => {
         const rows = byStatus.get(status) ?? [];

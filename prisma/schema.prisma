@@ -636,6 +636,16 @@ model Brand {
   aestheticFit   AestheticFit?
   notes          String?
 
+  // --- Partner breakeven (vendor viability KPI) ------------------------------
+  // Online partners pay ongoing program fees. Combined with Haiwan's commission
+  // and the vendor's markup, these drive the breakeven-RRP model in lib/breakeven.ts
+  // (mirrors the "Vendor Breakeven Model" workbook). Fees are in the partner's
+  // native currency; feeCurrency selects the FX rate (see AppSetting).
+  feeCurrency       String?  @default("MYR") // MYR | USD | SGD
+  listingFeeMonthly Float?                   // monthly listing fee (native ccy)
+  adSpendMonthly    Float?                   // monthly committed ad spend (native ccy)
+  vendorMarkup      Float?                   // RRP = markup x cost (COGS% = 1/markup); null = use default
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -651,6 +661,12 @@ model AppSetting {
   targetInhousePct  Float    @default(0)
   // Inventory: highlight a product when a store's count falls to/below this.
   lowStockThreshold Int      @default(5)
+  // Partner-breakeven assumptions (editable on /brands): FX to MYR + the default
+  // vendor markup used when a brand hasn't set its own. Seeded to match the model
+  // workbook (USDMYR 4.08, SGDMYR 3.16, 3x markup, 1 Jul 2026).
+  fxUsdMyr            Float  @default(4.08)
+  fxSgdMyr            Float  @default(3.16)
+  defaultVendorMarkup Float  @default(3)
   updatedAt         DateTime @updatedAt
 }
 

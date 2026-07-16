@@ -40,6 +40,11 @@ function fields(formData: FormData) {
     trialStartDate: date("trialStartDate"),
     aestheticFit: (String(formData.get("aestheticFit") ?? "") as AestheticFit) || null,
     notes: str("notes"),
+    // Partner breakeven inputs.
+    feeCurrency: (String(formData.get("feeCurrency") ?? "").trim() || "MYR"),
+    listingFeeMonthly: num("listingFeeMonthly"),
+    adSpendMonthly: num("adSpendMonthly"),
+    vendorMarkup: num("vendorMarkup"),
   };
 }
 
@@ -65,6 +70,30 @@ export async function updateBrand(formData: FormData) {
 
   await prisma.brand.update({ where: { id }, data: { ...f, name: f.name, trialStartDate } });
   revalidatePath(`/brands/${id}`);
+  revalidatePath("/brands");
+}
+
+/** Edit the FX + default-markup assumptions used by the breakeven model. */
+export async function updateBreakevenAssumptions(formData: FormData) {
+  await requireSession();
+  const num = (k: string, fallback: number) => {
+    const v = parseFloat(String(formData.get(k) ?? "").trim());
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+  };
+  await prisma.appSetting.upsert({
+    where: { id: "default" },
+    update: {
+      fxUsdMyr: num("fxUsdMyr", 4.08),
+      fxSgdMyr: num("fxSgdMyr", 3.16),
+      defaultVendorMarkup: num("defaultVendorMarkup", 3),
+    },
+    create: {
+      id: "default",
+      fxUsdMyr: num("fxUsdMyr", 4.08),
+      fxSgdMyr: num("fxSgdMyr", 3.16),
+      defaultVendorMarkup: num("defaultVendorMarkup", 3),
+    },
+  });
   revalidatePath("/brands");
 }
 
