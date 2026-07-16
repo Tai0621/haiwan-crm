@@ -116,7 +116,7 @@ export default function BreakevenCard({ b }: { b: BrandBreakeven }) {
         <p className="mt-3 text-xs text-slate-400">Avg RRP is the partner&apos;s target mix (no sales yet) — swaps to sales-weighted once sell-through arrives.</p>
       )}
       {b.actualUnits === 0 && b.avgRrpBasis === "catalog-average" && (
-        <p className="mt-3 text-xs text-slate-400">Avg RRP is a plain catalog average — set a target avg RRP on the brand for a mix-weighted figure.</p>
+        <p className="mt-3 text-xs text-slate-400">Avg RRP is the simple average of this brand&apos;s linked product RRPs (no sales yet) — set a target avg RRP to override with an expected mix.</p>
       )}
 
       {/* Charts */}
