@@ -241,3 +241,81 @@ export async function brandBreakeven(
 
   return { ...result, avgRrp, actualUnits, actualRevenue, monthsActive, avgRrpBasis, monthly };
 }
+
+// ---------------------------------------------------------------------------
+// Portfolio roll-up — the aggregate breakeven KPI across all consignment
+// partners (the workbook's "Portfolio Total" row + an actual-vs-target lens).
+// ---------------------------------------------------------------------------
+
+export interface PortfolioRow {
+  id: string;
+  name: string;
+  feesMonthly: number;
+  breakevenMonthly: number;
+  actualMonthly: number | null;
+  coverage: number | null;
+  status: BreakevenStatus;
+  unitsDay: number | null;
+}
+
+export interface ConsignmentPortfolio {
+  partnerCount: number;         // partners with a breakeven target (fees set)
+  totalFeesMonthly: number;     // combined monthly fees partners pay (RM)
+  totalBreakevenMonthly: number;// combined RRP sales needed to all break even (RM)
+  totalBreakeven3Month: number; // combined 3-month trial breakeven (RM)
+  totalActualMonthly: number;   // combined actual RRP run-rate (RM)
+  coverage: number | null;      // totalActual / totalBreakeven
+  surplusMonthly: number;       // totalActual - totalBreakeven
+  profitable: number;
+  below: number;
+  noSales: number;
+  rows: PortfolioRow[];         // most at-risk first
+}
+
+const STATUS_SORT: Record<BreakevenStatus, number> = {
+  BELOW: 0, UNVIABLE: 1, NO_DATA: 2, PROFITABLE: 3, NO_FEES: 4,
+};
+
+/** Aggregate breakeven across every consignment / co-creation partner. */
+export async function consignmentPortfolio(
+  assumptions?: BreakevenAssumptions,
+): Promise<ConsignmentPortfolio> {
+  const a = assumptions ?? (await getAssumptions());
+  const brands = await prisma.brand.findMany({
+    where: { supplierType: { in: ["CONSIGNMENT", "CO_CREATION"] } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  const computed = await Promise.all(
+    brands.map(async (b) => ({ b, be: await brandBreakeven(b.id, a) })),
+  );
+
+  const rows: PortfolioRow[] = [];
+  let totalFeesMonthly = 0, totalBreakevenMonthly = 0, totalBreakeven3Month = 0, totalActualMonthly = 0;
+  let profitable = 0, below = 0, noSales = 0;
+
+  for (const { b, be } of computed) {
+    if (!be || be.breakevenRrpMonthly == null) continue; // untracked (no fees) or unviable
+    totalFeesMonthly += be.totalVendorCostMyr;
+    totalBreakevenMonthly += be.breakevenRrpMonthly;
+    totalBreakeven3Month += be.breakeven3MonthTrial ?? 0;
+    totalActualMonthly += be.actualMonthlyRrp ?? 0;
+    if (be.status === "PROFITABLE") profitable++;
+    else if (be.status === "BELOW") below++;
+    else noSales++;
+    rows.push({
+      id: b.id, name: b.name, feesMonthly: be.totalVendorCostMyr,
+      breakevenMonthly: be.breakevenRrpMonthly, actualMonthly: be.actualMonthlyRrp,
+      coverage: be.coverage, status: be.status, unitsDay: be.breakevenUnitsDay,
+    });
+  }
+  rows.sort((x, y) => STATUS_SORT[x.status] - STATUS_SORT[y.status] || y.breakevenMonthly - x.breakevenMonthly);
+
+  return {
+    partnerCount: rows.length,
+    totalFeesMonthly, totalBreakevenMonthly, totalBreakeven3Month, totalActualMonthly,
+    coverage: totalBreakevenMonthly > 0 ? totalActualMonthly / totalBreakevenMonthly : null,
+    surplusMonthly: totalActualMonthly - totalBreakevenMonthly,
+    profitable, below, noSales, rows,
+  };
+}

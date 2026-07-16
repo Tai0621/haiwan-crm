@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { brandList, TRIAL_WINDOW_DAYS, reconcileBrandTrials, type BrandListRow } from "@/lib/brands";
 import { productAnalysis } from "@/lib/analytics";
-import { getAssumptions } from "@/lib/breakeven";
+import { getAssumptions, consignmentPortfolio } from "@/lib/breakeven";
 import { setBrandStatus, updateBreakevenAssumptions } from "./actions";
 import NewBrandForm from "./NewBrandForm";
+import PortfolioBreakeven from "./PortfolioBreakeven";
 import { rm } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -139,7 +140,9 @@ function FlatTable({ rows }: { rows: BrandListRow[] }) {
 
 export default async function BrandsPage() {
   await reconcileBrandTrials();
-  const [brands, candidates, assumptions] = await Promise.all([brandList(), productAnalysis(), getAssumptions()]);
+  const [brands, candidates, assumptions, portfolio] = await Promise.all([
+    brandList(), productAnalysis(), getAssumptions(), consignmentPortfolio(),
+  ]);
   const aInput = "w-24 rounded-md border border-slate-200 px-2 py-1 text-sm";
 
   // Three buckets by supplier type. Co-creation is a partnership graduation, so
@@ -173,6 +176,9 @@ export default async function BrandsPage() {
         <p className="-mt-2 text-sm text-slate-500">
           Partners pay listing fees + commission, so each has a breakeven target (open a brand to see it). Move brands through the pipeline as they progress.
         </p>
+
+        {/* Aggregate breakeven KPI across all fee-paying partners. */}
+        <PortfolioBreakeven p={portfolio} />
 
         {/* Breakeven assumptions — only relevant to consignment economics. */}
         <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
