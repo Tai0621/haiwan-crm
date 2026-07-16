@@ -19,9 +19,14 @@ const label = "block text-xs font-medium text-slate-500 mb-1";
 
 export default async function BrandDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [detail, breakeven] = await Promise.all([brandDetail(id), brandBreakeven(id)]);
+  const detail = await brandDetail(id);
   if (!detail) notFound();
   const { brand, trialDay, products, metrics } = detail;
+
+  // Breakeven is a partnership economics concept (fees + commission), so it only
+  // applies to consignment / co-creation brands — not trading or in-house.
+  const isPartnership = brand.supplierType === "CONSIGNMENT" || brand.supplierType === "CO_CREATION";
+  const breakeven = isPartnership ? await brandBreakeven(id) : null;
 
   const isoDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 
