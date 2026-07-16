@@ -28,7 +28,9 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   const isPartnership = brand.supplierType === "CONSIGNMENT" || brand.supplierType === "CO_CREATION";
   const breakeven = isPartnership ? await brandBreakeven(id) : null;
   const isNewPartner =
-    isPartnership && Date.now() - brand.createdAt.getTime() < NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    isPartnership &&
+    (brand.listingFeeMonthly != null || brand.adSpendMonthly != null) &&
+    Date.now() - brand.createdAt.getTime() < NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
   const isoDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 

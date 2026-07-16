@@ -73,7 +73,11 @@ export async function brandList(): Promise<BrandListRow[]> {
       b.status === "TRIAL" && b.trialStartDate
         ? Math.floor((now - b.trialStartDate.getTime()) / MS_PER_DAY)
         : null,
-    isNew: now - b.createdAt.getTime() < NEW_WINDOW_DAYS * MS_PER_DAY,
+    // "New" only for configured fee-paying partners (a fee structure entered) —
+    // an unconfigured/demo consignment brand has no breakeven to watch yet.
+    isNew:
+      now - b.createdAt.getTime() < NEW_WINDOW_DAYS * MS_PER_DAY &&
+      (b.listingFeeMonthly != null || b.adSpendMonthly != null),
     rollup: rollups.get(b.id) ?? { units: 0, revenue: 0, productCount: 0 },
   }));
 }
