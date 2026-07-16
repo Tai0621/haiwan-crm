@@ -1,5 +1,6 @@
 import type { BrandBreakeven } from "@/lib/breakeven";
 import { rm } from "@/lib/format";
+import BreakevenCharts from "./BreakevenChartsClient";
 
 const num0 = (n: number) => n.toLocaleString("en-MY", { maximumFractionDigits: 0 });
 const num1 = (n: number) => n.toLocaleString("en-MY", { maximumFractionDigits: 1 });
@@ -115,29 +116,17 @@ export default function BreakevenCard({ b }: { b: BrandBreakeven }) {
         <p className="mt-3 text-xs text-slate-400">Avg RRP is a catalog average (no sales yet to weight by).</p>
       )}
 
-      {/* Sensitivity */}
+      {/* Charts */}
       {b.status !== "NO_FEES" && (
-        <div className="mt-4 border-t border-slate-100 pt-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Breakeven RRP sales / mth vs vendor markup
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {b.sensitivity.map((sc) => (
-              <div
-                key={sc.markup}
-                className={`rounded-md border px-2.5 py-1.5 text-center ${sc.markup === b.markup ? "border-slate-300 bg-slate-50" : "border-slate-200"}`}
-              >
-                <div className="text-[11px] text-slate-400">{num1(sc.markup)}× cost</div>
-                <div className="text-sm font-medium tabular-nums text-slate-800">
-                  {sc.breakevenRrpMonthly != null ? `RM ${num0(sc.breakevenRrpMonthly)}` : "—"}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-slate-400">
-            Lower markup = thinner vendor margin = more volume needed to clear the same fees.
-          </p>
-        </div>
+        <BreakevenCharts
+          monthly={b.monthly}
+          breakevenRrpMonthly={b.breakevenRrpMonthly}
+          sensitivity={b.sensitivity}
+          currentMarkup={b.markup}
+          commissionPct={b.commissionPct}
+          cogsPct={b.cogsPct}
+          netPerRm1={b.netPerRm1}
+        />
       )}
     </div>
   );

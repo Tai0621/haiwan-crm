@@ -18,8 +18,23 @@
 // =============================================================================
 
 import { prisma } from "./db";
+import { monthKeyMYT } from "./format";
 
 const DAYS_PER_MONTH = 30.4; // matches the workbook
+const TREND_MONTHS = 12;
+
+/** Last N month keys ("YYYY-MM") in MYT, oldest first. */
+function lastMonthKeys(now: Date, n: number): string[] {
+  const myt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // shift so UTC getters read MYT
+  const keys: string[] = [];
+  let y = myt.getUTCFullYear();
+  let m = myt.getUTCMonth();
+  for (let i = 0; i < n; i++) {
+    keys.unshift(`${y}-${String(m + 1).padStart(2, "0")}`);
+    if (--m < 0) { m = 11; y--; }
+  }
+  return keys;
+}
 
 export interface BreakevenAssumptions {
   fxUsdMyr: number;
@@ -143,6 +158,7 @@ export interface BrandBreakeven extends BreakevenResult {
   actualRevenue: number;
   monthsActive: number;
   avgRrpBasis: "sales-weighted" | "catalog-average" | "none";
+  monthly: Array<{ month: string; rrp: number }>; // last 12 MYT months of RRP sales
 }
 
 /**
@@ -172,6 +188,9 @@ export async function brandBreakeven(
   let actualRevenue = 0;
   let earliest: Date | null = null;
   const catalogPrices: number[] = [];
+  const monthKeys = lastMonthKeys(new Date(), TREND_MONTHS);
+  const monthIdx = new Map(monthKeys.map((k, i) => [k, i]));
+  const monthRrp = monthKeys.map(() => 0);
   for (const p of products) {
     if (p.retailPrice != null && p.retailPrice > 0) catalogPrices.push(p.retailPrice);
     for (const l of p.lines) {
@@ -179,8 +198,11 @@ export async function brandBreakeven(
       actualRevenue += l.lineTotal;
       const d = l.transaction.transactionDate;
       if (!earliest || d < earliest) earliest = d;
+      const idx = monthIdx.get(monthKeyMYT(d));
+      if (idx !== undefined) monthRrp[idx] += l.lineTotal;
     }
   }
+  const monthly = monthKeys.map((month, i) => ({ month, rrp: monthRrp[i] }));
 
   // Avg RRP: sales-weighted realized price when we have sales, else catalog mean.
   let avgRrp: number | null = null;
@@ -212,5 +234,5 @@ export async function brandBreakeven(
     a,
   );
 
-  return { ...result, avgRrp, actualUnits, actualRevenue, monthsActive, avgRrpBasis };
+  return { ...result, avgRrp, actualUnits, actualRevenue, monthsActive, avgRrpBasis, monthly };
 }
