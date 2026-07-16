@@ -12,6 +12,8 @@ import { effectiveStage } from "./analytics";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 export const TRIAL_WINDOW_DAYS = 90;
+// How long a freshly added consignment partner keeps its "New" badge.
+export const NEW_WINDOW_DAYS = 30;
 
 export interface BrandRollup {
   units: number;
@@ -48,6 +50,7 @@ export interface BrandListRow {
   nextStep: string | null;
   aestheticFit: string | null;
   trialDay: number | null; // days since trialStartDate (TRIAL brands)
+  isNew: boolean; // added within the last NEW_WINDOW_DAYS
   rollup: BrandRollup;
 }
 
@@ -70,6 +73,7 @@ export async function brandList(): Promise<BrandListRow[]> {
       b.status === "TRIAL" && b.trialStartDate
         ? Math.floor((now - b.trialStartDate.getTime()) / MS_PER_DAY)
         : null,
+    isNew: now - b.createdAt.getTime() < NEW_WINDOW_DAYS * MS_PER_DAY,
     rollup: rollups.get(b.id) ?? { units: 0, revenue: 0, productCount: 0 },
   }));
 }

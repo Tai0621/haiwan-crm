@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { brandDetail, TRIAL_WINDOW_DAYS } from "@/lib/brands";
+import { brandDetail, TRIAL_WINDOW_DAYS, NEW_WINDOW_DAYS } from "@/lib/brands";
 import { brandBreakeven } from "@/lib/breakeven";
 import { updateBrand } from "../actions";
 import { rm } from "@/lib/format";
@@ -27,6 +27,8 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   // applies to consignment / co-creation brands — not trading or in-house.
   const isPartnership = brand.supplierType === "CONSIGNMENT" || brand.supplierType === "CO_CREATION";
   const breakeven = isPartnership ? await brandBreakeven(id) : null;
+  const isNewPartner =
+    isPartnership && Date.now() - brand.createdAt.getTime() < NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
   const isoDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 
@@ -38,7 +40,12 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
       <div className="rounded-lg border border-slate-200 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{brand.name}</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-slate-900">
+              {brand.name}
+              {isNewPartner && (
+                <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-blue-700">New</span>
+              )}
+            </h1>
             <p className="mt-1 text-sm text-slate-500">
               {SUPPLIER_LABELS[brand.supplierType]} · {STATUS_LABELS[brand.status]}
               {brand.owner ? ` · ${brand.owner}` : ""}

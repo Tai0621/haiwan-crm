@@ -65,7 +65,12 @@ function PipelineTable({ rows }: { rows: BrandListRow[] }) {
           {rows.map((b) => (
             <tr key={b.id} className="hover:bg-slate-50">
               <td className="px-3 py-2">
-                <Link href={`/brands/${b.id}`} className="font-medium text-slate-900 hover:underline">{b.name}</Link>
+                <span className="inline-flex items-center gap-1.5">
+                  <Link href={`/brands/${b.id}`} className="font-medium text-slate-900 hover:underline">{b.name}</Link>
+                  {b.isNew && (
+                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">New</span>
+                  )}
+                </span>
                 <FitTrialTags b={b} />
               </td>
               <td className="px-3 py-2 text-slate-600">{SUPPLIER_LABELS[b.supplierType]}</td>
