@@ -40,6 +40,9 @@ const Icons: Record<string, (p: IconProps) => ReactElement> = {
   analysis: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="m19 9-5 5-4-4-3 3" /></svg>
   ),
+  marketing: ({ className = ic }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
+  ),
   revenue: ({ className = ic }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z" /><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /></svg>
   ),
@@ -115,6 +118,7 @@ const ENTRIES: NavEntry[] = [
     children: [
       { href: "/revenue", label: "Revenue mix", icon: "revenue" },
       { href: "/analysis", label: "Analysis", icon: "analysis" },
+      { href: "/marketing", label: "Marketing", icon: "marketing" },
     ],
   },
   { href: "/whatsapp", label: "WhatsApp", icon: "whatsapp" },

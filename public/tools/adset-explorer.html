@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Haiwan — Adset Strategy Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sage: #738A7C;
+    --sage-dark: #566356;
+    --terracotta: #B0623B;
+    --terracotta-dark: #8f4d2e;
+    --paper: #F6F4EC;
+    --card: #FFFFFF;
+    --card-muted: #EFEDE3;
+    --ink: #26281F;
+    --ink-soft: #5B5D50;
+    --border: #DCD8C7;
+    --warn-bg: #FBF1E7;
+    --warn-border: #E3B98C;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .display { font-family: 'Fraunces', serif; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 300px 1fr 240px;
+    min-height: 100vh;
+  }
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .jump-panel { order: 3; }
+  }
+
+  /* ---- header strip ---- */
+  .topbar {
+    grid-column: 1 / -1;
+    padding: 22px 28px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .topbar .brand { display: flex; align-items: baseline; gap: 10px; }
+  .topbar h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .topbar .kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--sage-dark);
+    font-weight: 700;
+  }
+  .topbar .meta {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  /* ---- controls column ---- */
+  .controls {
+    border-right: 1px solid var(--border);
+    padding: 20px 20px 40px;
+    background: var(--card);
+  }
+  .control-group { margin-bottom: 22px; }
+  .control-group .label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .pillrow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pill {
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 7px 11px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    line-height: 1.2;
+  }
+  .pill:hover { border-color: var(--sage); }
+  .pill.active {
+    background: var(--sage);
+    border-color: var(--sage);
+    color: #fff;
+    font-weight: 600;
+  }
+  .pill.active.terra {
+    background: var(--terracotta);
+    border-color: var(--terracotta);
+  }
+  .reset-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    border: 1px dashed var(--sage);
+    background: transparent;
+    color: var(--sage-dark);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  .reset-btn:hover { background: var(--card-muted); }
+
+  /* ---- main stage ---- */
+  .stage { padding: 28px 36px 60px; max-width: 760px; }
+  .tagstrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 4px 9px;
+    border-radius: 4px;
+    background: var(--card-muted);
+    color: var(--sage-dark);
+    border: 1px solid var(--border);
+  }
+  .tldr {
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--ink);
+    margin: 0 0 26px;
+    padding: 18px 20px;
+    background: var(--card);
+    border-left: 4px solid var(--terracotta);
+    border-radius: 4px;
+  }
+  .tldr b { color: var(--terracotta-dark); }
+
+  .block {
+    margin-bottom: 22px;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .block h3 {
+    font-size: 13.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--sage-dark);
+    margin: 0 0 8px;
+  }
+  .block p { font-size: 14.5px; line-height: 1.65; margin: 0; color: var(--ink); }
+
+  .flag {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+  .flag b { color: var(--terracotta-dark); }
+
+  .copybtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    margin-bottom: 24px;
+  }
+  .copybtn:hover { background: #3d3f33; }
+  .copied { color: var(--sage); font-size: 12px; margin-left: 8px; }
+
+  /* ---- notes section ---- */
+  .notes-section {
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+  }
+  .notes-section h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  .notes-section .sub {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+  .note-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .note-item .txt { white-space: pre-wrap; flex: 1; }
+  .note-item .del {
+    background: none; border: none; color: var(--ink-soft);
+    cursor: pointer; font-size: 15px; line-height: 1;
+    padding: 0 2px; align-self: flex-start;
+  }
+  .note-item .del:hover { color: var(--terracotta); }
+  .note-empty {
+    font-size: 13px; color: var(--ink-soft); font-style: italic; margin-bottom: 12px;
+  }
+  textarea#note-input {
+    width: 100%;
+    min-height: 74px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    resize: vertical;
+    background: var(--card);
+    color: var(--ink);
+  }
+  textarea#note-input:focus { outline: 2px solid var(--sage); outline-offset: 1px; }
+  .save-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .save-btn {
+    background: var(--terracotta);
+    color: #fff;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .save-btn:hover { background: var(--terracotta-dark); }
+  .save-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* ---- jump panel ---- */
+  .jump-panel {
+    border-left: 1px solid var(--border);
+    padding: 20px 18px 40px;
+    background: var(--card);
+  }
+  .jump-panel .label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    display: block;
+  }
+  .jump-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--ink);
+    cursor: pointer;
+    margin-bottom: 6px;
+    font-family: 'Inter', sans-serif;
+  }
+  .jump-item:hover { border-color: var(--sage); }
+  .jump-item .n { color: var(--sage-dark); font-weight: 700; }
+  .jump-empty { font-size: 11.5px; color: var(--ink-soft); font-style: italic; }
+  .shared-note {
+    font-size: 10.5px; color: var(--ink-soft); margin-top: 16px; line-height: 1.5;
+    padding-top: 12px; border-top: 1px dashed var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- Storage shim: outside the artifact runtime there is no window.storage, so
+     back the team notes with localStorage (per-browser). Swap for a shared
+     backend later if notes need to sync across the team. -->
+<script>
+  if (!window.storage) {
+    window.storage = {
+      get: async (k) => { const v = localStorage.getItem(k); return v != null ? { value: v } : null; },
+      set: async (k, v) => { localStorage.setItem(k, v); return true; },
+      list: async (prefix) => ({ keys: Object.keys(localStorage).filter((k) => k.startsWith(prefix)) }),
+    };
+  }
+</script>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <span class="kicker">Haiwan</span>
+      <h1>Adset Strategy Explorer</h1>
+    </div>
+    <div class="meta">Toggle a variable → the page below regenerates for that exact combination.</div>
+  </div>
+
+  <aside class="controls" id="controls"></aside>
+
+  <main class="stage" id="stage"></main>
+
+  <aside class="jump-panel">
+    <span class="label">Combos with team notes</span>
+    <div id="jump-list"></div>
+    <div class="shared-note">Notes saved here are shared — anyone opening this artifact can see and add to them.</div>
+  </aside>
+</div>
+
+<script>
+(function(){
+
+  // ---------------- variable definitions ----------------
+  const VARS = [
+    { key: 'country', label: 'Country', options: [
+      { id: 'DE', label: 'Germany' },
+      { id: 'BE', label: 'Belgium' },
+      { id: 'NL', label: 'Netherlands' },
+      { id: 'CA', label: 'Canada' }
+    ]},
+    { key: 'product', label: 'Product', options: [
+      { id: 'MILIEU', label: 'MILIEU (RM1,699)' },
+      { id: 'PADDLE', label: 'Paddle Pop (RM2,989)' }
+    ]},
+    { key: 'angle', label: 'Messaging angle', options: [
+      { id: 'AESTHETIC', label: 'Aesthetic / interior-fit' },
+      { id: 'FUNCTIONAL', label: 'Functional / behavior' }
+    ]},
+    { key: 'interest', label: 'Interest overlap', options: [
+      { id: 'CATONLY', label: 'Cat-only (control)' },
+      { id: 'INTERIOR', label: 'Cat + interior design' },
+      { id: 'LIFESTYLE', label: 'Cat + premium lifestyle' }
+    ]},
+    { key: 'format', label: 'Creative format', options: [
+      { id: 'STATIC', label: 'Static image' },
+      { id: 'VIDEO', label: 'Video (flat-pack → built)' },
+      { id: 'CAROUSEL', label: 'Carousel' }
+    ]},
+    { key: 'cta', label: 'CTA format', options: [
+      { id: 'MESSAGE', label: 'Send Message (WhatsApp)' },
+      { id: 'LEARNMORE', label: 'Learn More (landing page)' }
+    ]},
+    { key: 'placement', label: 'Placement', options: [
+      { id: 'IG', label: 'Instagram Feed/Reels' },
+      { id: 'FB', label: 'Facebook Feed' },
+      { id: 'STORIES', label: 'Stories' }
+    ]},
+    { key: 'age', label: 'Age band', options: [
+      { id: 'A2534', label: '25–34' },
+      { id: 'A3544', label: '35–44' },
+      { id: 'A4555', label: '45–55' }
+    ]}
+  ];
+
+  const DEFAULT = {
+    country: 'DE', product: 'MILIEU', angle: 'AESTHETIC', interest: 'INTERIOR',
+    format: 'VIDEO', cta: 'MESSAGE', placement: 'IG', age: 'A2534'
+  };
+
+  let state = Object.assign({}, DEFAULT);
+
+  // ---------------- content fragments ----------------
+  const F = {
+    country: {
+      DE: { label:'Germany', priority:'Anchor market', text:"Germany is the largest cat-owning market in the EU (~15M cats, ~44% of households own a pet) — treat this as the anchor test market and allocate the largest share of first-wave budget here (suggested ~40%)." },
+      BE: { label:'Belgium', priority:'Premium niche', text:"Belgium has among the highest per-capita cat ownership in Europe and skews design-conscious with high disposable income — a good fit for premium positioning, but keep spend modest (~20%) given the smaller total population." },
+      NL: { label:'Netherlands', priority:'Secondary market', text:"The Netherlands has a stable but flat-to-declining pet population — treat this as a secondary market to confirm the winning combo travels beyond Germany, not a primary growth bet (~20% of budget)." },
+      CA: { label:'Canada', priority:'Independent test', text:"Canada sits outside the EU with its own customs regime and the longest, most expensive shipping lane from Malaysia — run it as an independent test cell (~20% of budget) rather than averaging its results with the EU markets." }
+    },
+    product: {
+      MILIEU: { label:'MILIEU', text:"MILIEU (RM1,699, cherry wood + matte chrome) reads as a refined, minimalist piece — creative should lean Scandinavian, mid-century, or warm-minimalist interiors, and can credibly sit next to real furniture in the shot, not just 'pet gear.'" },
+      PADDLE: { label:'Paddle Pop', text:"Paddle Pop (RM2,989, colourful acrylic + plywood) reads as a bold design statement piece — creative should lean eclectic, colourful, Gen-Z-apartment interiors rather than a neutral or minimalist room, which would undersell it." }
+    },
+    angle: {
+      AESTHETIC: { label:'Aesthetic / interior-fit', text:"Lead with the interior-fit angle: open on a styled room that matches the product's own aesthetic (see product direction above), and let 'does this look right in my home' be the primary hook. Close on shipping/trust reassurance rather than leaving it as an open question." },
+      FUNCTIONAL: { label:'Functional / behavior', text:"Lead with the functional angle: multi-cat household management, keeping cats off real furniture, or scratching/climbing needs — treat pet-parent problem-solving as the primary hook rather than aesthetics." }
+    },
+    interest: {
+      CATONLY: { label:'Cat-only (control)', text:"Keep targeting to core cat interests only (cat behavior, breeds, cat product brands). This is your control cell — use it to benchmark whether the overlap layers below actually add lift, rather than assuming they will." },
+      INTERIOR: { label:'Cat + interior design', text:"Layer interior-design/home-decor interest signals (Scandinavian design, home styling brands, IKEA) on top of core cat interests. Pairs naturally with the aesthetic messaging angle." },
+      LIFESTYLE: { label:'Cat + premium lifestyle', text:"Layer premium pet-parent lifestyle signals (premium pet food brands, pet boutiques, 'cat mom/dad' identity content) on top of core cat interests. Tests identity-driven purchase motivation rather than home-styling motivation." }
+    },
+    format: {
+      STATIC: { label:'Static image', text:"A static styled-room lifestyle image — cheapest to produce, good for the first cost-efficiency pass, but leaves 'how does this even ship here' unanswered for an unfamiliar international buyer." },
+      VIDEO: { label:'Video', text:"A short video showing the flat-pack-to-assembled transformation — this reframes 'flat-packed' from a negative into the reason international delivery is possible at all, and pre-empts the shipping-doubt objection before the customer has to ask." },
+      CAROUSEL: { label:'Carousel', text:"A carousel showing the product across a few room angles or styles — best used once a single hero image/video has already validated the concept and you're testing breadth of appeal." }
+    },
+    cta: {
+      MESSAGE: { label:'Send Message', text:"CTA: \u201cSend Message\u201d straight to WhatsApp. Appropriate for the current phase while the exact shipping rate and DDP/DDU decision aren\u2019t locked yet \u2014 a human in the chat can handle the nuance a fixed landing page can\u2019t yet." },
+      LEARNMORE: { label:'Learn More', text:"CTA: \u201cLearn More\u201d to a landing page that pre-answers shipping cost/time and duties before WhatsApp. This assumes the exact rate and DDP/DDU are already locked \u2014 using it before that point risks the page stating something the business can\u2019t yet back up." }
+    },
+    placement: {
+      IG: { label:'Instagram', text:"Prioritize Instagram Feed/Reels \u2014 the design-conscious, cat-and-lifestyle-interest audience skews Instagram over Facebook, especially at younger age bands." },
+      FB: { label:'Facebook', text:"Include Facebook Feed \u2014 useful especially for the 45\u201355 age band, who may still respond better there than on Instagram." },
+      STORIES: { label:'Stories', text:"Test Stories as a cheaper top-of-funnel supplement rather than the main placement \u2014 good for reach, less suited to carrying the full interior-fit story." }
+    },
+    age: {
+      A2534: { label:'25\u201334', text:"25\u201334: apartment-living, early design-conscious buyers \u2014 pairs well with aesthetic-led messaging and Instagram-first placement." },
+      A3544: { label:'35\u201344', text:"35\u201344: established households, often multi-cat \u2014 responsive to either angle; a good band to test aesthetic vs. functional messaging head-to-head." },
+      A4555: { label:'45\u201355', text:"45\u201355: higher disposable income, established homeowners \u2014 pairs well with craftsmanship/quality framing and a Facebook placement split." }
+    }
+  };
+
+  function smartFlags(s){
+    const flags = [];
+    if (s.country === 'CA' && s.format === 'STATIC') {
+      flags.push("Canada is the least familiar, longest shipping lane in this set \u2014 a static image alone may leave \u201chow does this even get to me\u201d unanswered. Consider switching to the video format for this combination.");
+    }
+    if (s.cta === 'LEARNMORE') {
+      flags.push("This CTA assumes the shipping rate and DDP/DDU decision are already locked. If those are still pending, use \u201cSend Message\u201d instead so a human can handle the open questions.");
+    }
+    if (s.interest === 'CATONLY') {
+      flags.push("This is the control cell \u2014 no lifestyle or design overlay. Keep at least one adset here in every country so you have a clean baseline to compare the overlap layers against.");
+    }
+    if (s.angle === 'FUNCTIONAL' && s.interest === 'INTERIOR') {
+      flags.push("Functional messaging paired with interior-design targeting is a valid deliberate cross-test, but expect softer resonance than pairing aesthetic messaging with this same audience \u2014 treat this as a cross-test, not a default pick.");
+    }
+    if (s.product === 'PADDLE' && s.angle === 'FUNCTIONAL') {
+      flags.push("Paddle Pop\u2019s value is largely visual (bold colour, design statement) \u2014 a purely functional angle undersells its main differentiator. Worth pairing this cell against the aesthetic-angle version to see how much the visual story actually matters.");
+    }
+    return flags;
+  }
+
+  // ---------------- storage helpers ----------------
+  function comboKey(s){
+    return 'combo:' + VARS.map(v => s[v.key]).join('|');
+  }
+  function comboLabel(s){
+    return VARS.map(v => F[v.key][s[v.key]].label).join(' \u00b7 ');
+  }
+  function parseKey(key){
+    const parts = key.replace('combo:', '').split('|');
+    const s = {};
+    VARS.forEach((v, i) => { s[v.key] = parts[i]; });
+    return s;
+  }
+
+  async function loadNotes(key){
+    try {
+      const res = await window.storage.get(key, true);
+      if (res && res.value) return JSON.parse(res.value);
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+  async function saveNotes(key, notes){
+    try {
+      await window.storage.set(key, JSON.stringify(notes), true);
+      return true;
+    } catch (e) {
+      console.error('save failed', e);
+      return false;
+    }
+  }
+  async function listComboKeys(){
+    try {
+      const res = await window.storage.list('combo:', true);
+      return (res && res.keys) ? res.keys : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ---------------- rendering ----------------
+  const controlsEl = document.getElementById('controls');
+  const stageEl = document.getElementById('stage');
+  const jumpEl = document.getElementById('jump-list');
+
+  function renderControls(){
+    controlsEl.innerHTML = '';
+    VARS.forEach(v => {
+      const group = document.createElement('div');
+      group.className = 'control-group';
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = v.label;
+      group.appendChild(label);
+      const row = document.createElement('div');
+      row.className = 'pillrow';
+      v.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'pill' + (state[v.key] === opt.id ? ' active' + (v.key==='cta'?' terra':'') : '');
+        btn.textContent = opt.label;
+        btn.onclick = () => { state[v.key] = opt.id; render(); };
+        row.appendChild(btn);
+      });
+      group.appendChild(row);
+      controlsEl.appendChild(group);
+    });
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'reset-btn';
+    resetBtn.textContent = '\u21ba Reset to recommended first test';
+    resetBtn.onclick = () => { state = Object.assign({}, DEFAULT); render(); };
+    controlsEl.appendChild(resetBtn);
+  }
+
+  function buildTldr(s){
+    return `Run <b>${F.product[s.product].label}</b> in <b>${F.country[s.country].label}</b>, targeting women <b>${F.age[s.age].label}</b> with <b>${F.interest[s.interest].label.toLowerCase()}</b> interests, using a <b>${F.format[s.format].label.toLowerCase()}</b> with <b>${F.angle[s.angle].label.toLowerCase()}</b> messaging on <b>${F.placement[s.placement].label}</b>, driving to <b>${F.cta[s.cta].label}</b>.`;
+  }
+
+  function plainSummary(s){
+    return `${F.product[s.product].label} \u2014 ${F.country[s.country].label} \u2014 ${F.age[s.age].label} women \u2014 ${F.interest[s.interest].label} \u2014 ${F.format[s.format].label} \u2014 ${F.angle[s.angle].label} \u2014 ${F.placement[s.placement].label} \u2014 ${F.cta[s.cta].label}`;
+  }
+
+  function fullStrategyText(s){
+    const lines = [];
+    lines.push('HAIWAN ADSET STRATEGY \u2014 ' + comboLabel(s));
+    lines.push('');
+    lines.push('Market & Budget: ' + F.country[s.country].text);
+    lines.push('');
+    lines.push('Product & Creative Direction: ' + F.product[s.product].text + ' ' + F.format[s.format].text);
+    lines.push('');
+    lines.push('Messaging Angle: ' + F.angle[s.angle].text);
+    lines.push('');
+    lines.push('Targeting: ' + F.interest[s.interest].text + ' ' + F.age[s.age].text);
+    lines.push('');
+    lines.push('CTA & Funnel Stage: ' + F.cta[s.cta].text);
+    lines.push('');
+    lines.push('Placement: ' + F.placement[s.placement].text);
+    const flags = smartFlags(s);
+    if (flags.length){
+      lines.push('');
+      lines.push('Watch-outs:');
+      flags.forEach(f => lines.push('\u2022 ' + f));
+    }
+    return lines.join('\n');
+  }
+
+  let noteState = { key: null, notes: [] };
+
+  async function render(){
+    renderControls();
+
+    const key = comboKey(state);
+    const label = comboLabel(state);
+
+    stageEl.innerHTML = `
+      <div class="tagstrip">${VARS.map(v => `<span class="tag">${F[v.key][state[v.key]].label}</span>`).join('')}</div>
+      <p class="tldr">${buildTldr(state)}</p>
+
+      <div class="block"><h3>Market & Budget</h3><p>${F.country[state.country].text}</p></div>
+      <div class="block"><h3>Product & Creative Direction</h3><p>${F.product[state.product].text} ${F.format[state.format].text}</p></div>
+      <div class="block"><h3>Messaging Angle</h3><p>${F.angle[state.angle].text}</p></div>
+      <div class="block"><h3>Targeting</h3><p>${F.interest[state.interest].text} ${F.age[state.age].text}</p></div>
+      <div class="block"><h3>CTA & Funnel Stage</h3><p>${F.cta[state.cta].text}</p></div>
+      <div class="block"><h3>Placement</h3><p>${F.placement[state.placement].text}</p></div>
+
+      <div id="flags"></div>
+
+      <button class="copybtn" id="copy-btn">Copy this strategy <span id="copy-status"></span></button>
+
+      <div class="notes-section">
+        <h2>Team notes for this exact combination</h2>
+        <div class="sub">${label}</div>
+        <div id="notes-list"></div>
+        <textarea id="note-input" placeholder="Add a strategy note, creative idea, or result for this exact combination..."></textarea>
+        <div class="save-row"><button class="save-btn" id="save-btn">Save note</button></div>
+      </div>
+    `;
+
+    const flags = smartFlags(state);
+    const flagsEl = document.getElementById('flags');
+    flagsEl.innerHTML = flags.map(f => `<div class="flag">\u26a0\ufe0f ${f}</div>`).join('');
+
+    document.getElementById('copy-btn').onclick = async () => {
+      const text = fullStrategyText(state);
+      const statusEl = document.getElementById('copy-status');
+      try {
+        await navigator.clipboard.writeText(text);
+        statusEl.textContent = '\u2713 copied';
+      } catch (e) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          statusEl.textContent = '\u2713 copied';
+        } catch (e2) {
+          statusEl.textContent = 'copy failed';
+        }
+      }
+      setTimeout(() => { statusEl.textContent = ''; }, 1800);
+    };
+
+    await refreshNotes(key);
+    renderJumpList();
+  }
+
+  async function refreshNotes(key){
+    noteState.key = key;
+    noteState.notes = await loadNotes(key);
+    renderNotesList();
+  }
+
+  function renderNotesList(){
+    const listEl = document.getElementById('notes-list');
+    if (!listEl) return;
+    if (!noteState.notes.length){
+      listEl.innerHTML = '<div class="note-empty">No notes yet for this combination \u2014 be the first to add one.</div>';
+      return;
+    }
+    listEl.innerHTML = noteState.notes.map((n, i) => `
+      <div class="note-item">
+        <span class="txt">${escapeHtml(n.text)}</span>
+        <button class="del" data-idx="${i}" title="Delete note">\u00d7</button>
+      </div>
+    `).join('');
+    Array.from(listEl.querySelectorAll('.del')).forEach(btn => {
+      btn.onclick = async () => {
+        const idx = parseInt(btn.getAttribute('data-idx'), 10);
+        noteState.notes.splice(idx, 1);
+        await saveNotes(noteState.key, noteState.notes);
+        renderNotesList();
+        renderJumpList();
+      };
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.getElementById('stage').addEventListener('click', async (e) => {
+    if (e.target && e.target.id === 'save-btn'){
+      const input = document.getElementById('note-input');
+      const text = input.value.trim();
+      if (!text) return;
+      const btn = e.target;
+      btn.disabled = true;
+      noteState.notes.push({ text, ts: Date.now() });
+      const ok = await saveNotes(noteState.key, noteState.notes);
+      btn.disabled = false;
+      if (ok){
+        input.value = '';
+        renderNotesList();
+        renderJumpList();
+      }
+    }
+  });
+
+  async function renderJumpList(){
+    const keys = await listComboKeys();
+    if (!keys.length){
+      jumpEl.innerHTML = '<div class="jump-empty">No combinations have team notes yet.</div>';
+      return;
+    }
+    jumpEl.innerHTML = keys.map(k => {
+      const s = parseKey(k);
+      const lbl = VARS.map(v => F[v.key][s[v.key]] ? F[v.key][s[v.key]].label : s[v.key]).join(' \u00b7 ');
+      return `<button class="jump-item" data-key="${k}"><span class="n">\u25cf</span> ${lbl}</button>`;
+    }).join('');
+    Array.from(jumpEl.querySelectorAll('.jump-item')).forEach(btn => {
+      btn.onclick = () => {
+        const s = parseKey(btn.getAttribute('data-key'));
+        state = s;
+        render();
+      };
+    });
+  }
+
+  render();
+})();
+</script>
+
+</body>
+</html>
