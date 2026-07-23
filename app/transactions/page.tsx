@@ -18,7 +18,7 @@ export default async function TransactionsPage() {
       take: 100,
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        _count: { select: { lines: true } },
+        lines: { select: { quantity: true, rawProductName: true, product: { select: { name: true } } } },
       },
     }),
     prisma.transaction.count({ where: { storehubRef: { not: null } } }),
@@ -52,10 +52,19 @@ export default async function TransactionsPage() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-3">
-          Recent ({transactions.length}
-          {transactions.length === 100 ? "+" : ""})
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h2 className="text-lg font-semibold">
+            Recent ({transactions.length}
+            {transactions.length === 100 ? "+" : ""})
+          </h2>
+          <a
+            href="/export/transactions-xlsx"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            <svg className="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3" /><path d="m8 11 4 4 4-4" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg>
+            Export to Excel
+          </a>
+        </div>
         {transactions.length === 0 ? (
           <p className="text-sm text-slate-400">No transactions yet.</p>
         ) : (
@@ -66,6 +75,7 @@ export default async function TransactionsPage() {
                 <th className="py-2 font-medium">Date</th>
                 <th className="py-2 font-medium">Customer</th>
                 <th className="py-2 font-medium">Store</th>
+                <th className="py-2 font-medium">Products</th>
                 <th className="py-2 font-medium text-right">Items</th>
                 <th className="py-2 font-medium text-right">Total</th>
                 <th className="py-2 font-medium text-right">Source</th>
@@ -88,7 +98,24 @@ export default async function TransactionsPage() {
                     )}
                   </td>
                   <td className="py-2 text-slate-600">{STORE_LABELS[t.store]}</td>
-                  <td className="py-2 text-right text-slate-500 tabular-nums">{t._count.lines}</td>
+                  <td className="py-2 text-slate-600 max-w-[22rem]">
+                    {t.lines.length === 0 ? (
+                      <span className="text-slate-300">—</span>
+                    ) : (
+                      (() => {
+                        const names = t.lines.map((l) => l.product?.name ?? l.rawProductName);
+                        const shown = names.slice(0, 2).join(", ");
+                        const extra = names.length - 2;
+                        return (
+                          <span className="block truncate" title={names.join(", ")}>
+                            {shown}
+                            {extra > 0 && <span className="text-slate-400"> +{extra} more</span>}
+                          </span>
+                        );
+                      })()
+                    )}
+                  </td>
+                  <td className="py-2 text-right text-slate-500 tabular-nums">{t.lines.length}</td>
                   <td className="py-2 text-right text-slate-800 tabular-nums">{rm(t.totalAmount)}</td>
                   <td className="py-2 text-right">
                     <span className="text-[10px] uppercase tracking-wide text-slate-400">
