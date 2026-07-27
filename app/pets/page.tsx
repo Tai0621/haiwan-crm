@@ -44,7 +44,7 @@ export default async function PetsPage({ searchParams }: { searchParams: SearchP
     prisma.pet.count({ where }),
     prisma.pet.findMany({
       where,
-      orderBy: [{ species: "asc" }, { name: "asc" }],
+      orderBy: { updatedAt: "desc" },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         transactionLines: { select: { lineTotal: true } },

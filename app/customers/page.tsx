@@ -46,7 +46,7 @@ export default async function CustomersPage({
     prisma.customer.count({ where }),
     prisma.customer.findMany({
       where,
-      orderBy: [{ needsDetails: "desc" }, { updatedAt: "desc" }],
+      orderBy: { updatedAt: "desc" },
       include: {
         pets: { select: { id: true, name: true, species: true } },
         _count: { select: { transactions: true } },

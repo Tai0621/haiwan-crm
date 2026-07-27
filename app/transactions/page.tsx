@@ -14,7 +14,7 @@ export default async function TransactionsPage() {
   // form is opened (see AddTransactionForm lazy mode) so this page stays fast.
   const [transactions, importedCount, lastSale] = await Promise.all([
     prisma.transaction.findMany({
-      orderBy: { transactionDate: "desc" },
+      orderBy: [{ transactionDate: "desc" }, { createdAt: "desc" }],
       take: 100,
       include: {
         customer: { select: { id: true, name: true, phone: true } },
