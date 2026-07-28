@@ -314,8 +314,8 @@ export default async function PetProfilePage({
         </div>
       </div>
 
-      {/* ---- Subscriptions (this pet) ---- */}
-      {subscriptions.length > 0 && (
+      {/* ---- Subscriptions (this pet) — archived; flip `false` to restore. ---- */}
+      {false && subscriptions.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Subscriptions</h2>

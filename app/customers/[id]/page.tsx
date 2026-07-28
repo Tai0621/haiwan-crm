@@ -25,6 +25,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Membership is archived until there's an executive plan. Set true to restore
+// the Membership card (data/logic are untouched). Typed boolean so `member`
+// still narrows inside the guard.
+const SHOW_MEMBERSHIP: boolean = false;
+
 export default async function CustomerDetailPage({
   params,
 }: {
@@ -148,8 +153,8 @@ export default async function CustomerDetailPage({
         )}
       </div>
 
-      {/* Membership */}
-      {member && (
+      {/* Membership — archived (no executive plan yet); flip SHOW_MEMBERSHIP to restore. */}
+      {SHOW_MEMBERSHIP && member && (
         <div className="bg-white border border-slate-200 rounded-lg p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Membership</h2>

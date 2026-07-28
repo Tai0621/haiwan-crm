@@ -1,12 +1,8 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { getInbox, sweepExpiredHolds, reconcileNaming, type InboxItem } from "@/lib/tasks";
-import { reconcileMemberships } from "@/lib/membership";
-import { reconcileSubscriptions, estimatedMrr } from "@/lib/subscriptions";
 import { reconcileStockDrift } from "@/lib/inventory";
 import { reconcileBrandTrials } from "@/lib/brands";
 import { currentRole } from "@/lib/auth";
-import { rm } from "@/lib/format";
 import InboxRow from "@/app/components/InboxRow";
 import QuickAdd from "@/app/components/QuickAdd";
 import type { Store, TaskType } from "@/app/generated/prisma/client";
@@ -34,26 +30,26 @@ export default async function DashboardPage({
   const storeFilter = (sp.store as Store | "ALL") || "ALL";
   const typeFilter = (sp.type as TaskType | "ALL") || "ALL";
 
-  // Flip lapsed 24h holds to EXPIRED (+ courtesy follow-ups), lapse quiet members
-  // (+ WINBACK tasks), and raise SUBSCRIPTION_DUE tasks for due subscriptions,
-  // before reading the inbox so the list reflects the latest state on every load.
+  // Flip lapsed 24h holds to EXPIRED (+ courtesy follow-ups), raise brand-trial
+  // reviews, and flag naming/stock gaps before reading the inbox so the list
+  // reflects the latest state on every load. (Membership & subscription
+  // reconciles are archived — see below.)
   await Promise.all([
     sweepExpiredHolds(),
-    reconcileMemberships(),
-    reconcileSubscriptions(),
     reconcileBrandTrials(),
     reconcileNaming(),
     reconcileStockDrift(),
   ]);
 
-  const [inbox, activeSubs, mrr, role] = await Promise.all([
+  const [inbox, role] = await Promise.all([
     getInbox(), // unfiltered — drives counts + the available filter pills
-    prisma.subscription.count({ where: { status: "ACTIVE" } }),
-    estimatedMrr(),
     currentRole(),
   ]);
   // Frontline staff don't handle brand-trial reviews — hide them from their inbox.
-  const all = role === "frontline" ? inbox.filter((i) => i.type !== "BRAND_REVIEW") : inbox;
+  // Membership & subscription are archived, so hide their auto-generated tasks too.
+  const ARCHIVED_TYPES = new Set(["ACTIVATION", "WINBACK", "SUBSCRIPTION_DUE"]);
+  const visible = role === "frontline" ? inbox.filter((i) => i.type !== "BRAND_REVIEW") : inbox;
+  const all = visible.filter((i) => !ARCHIVED_TYPES.has(i.type));
 
   const overdue = all.filter((i) => i.isOverdue).length;
   const presentTypes = Array.from(new Set(all.map((i) => i.type)));
@@ -82,11 +78,9 @@ export default async function DashboardPage({
       </div>
 
       {/* Headline counts */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4">
         <StatCard label="To action now" value={all.length} accent={all.length ? undefined : "muted"} />
         <StatCard label="Overdue" value={overdue} accent={overdue ? "red" : "muted"} />
-        <StatCard label="Active subscriptions" value={activeSubs} href="/subscriptions" />
-        <StatCard label="Recurring / mo" value={rm(mrr)} href="/subscriptions" accent="emerald" />
       </div>
 
       <QuickAdd />

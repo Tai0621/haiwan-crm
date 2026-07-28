@@ -98,8 +98,8 @@ const ENTRIES: NavEntry[] = [
     children: [
       { href: "/customers", label: "Customer details", icon: "customers" },
       { href: "/pets", label: "Pet details", icon: "pets" },
-      { href: "/members", label: "Membership", icon: "members" },
-      { href: "/subscriptions", label: "Subscription", icon: "subscriptions" },
+      // Membership & Subscription archived (2026-07 — no executive plan yet).
+      // Routes/code/data preserved; restore by re-adding these entries.
     ],
   },
   {
@@ -134,7 +134,7 @@ const ENTRIES: NavEntry[] = [
 
 // Frontline staff only see these pages; management sees everything.
 type Role = "management" | "frontline";
-const FRONTLINE_HREFS = new Set(["/", "/shift", "/customers", "/pets", "/members", "/transactions", "/inventory"]);
+const FRONTLINE_HREFS = new Set(["/", "/shift", "/customers", "/pets", "/transactions", "/inventory"]);
 
 function visibleEntries(role: Role): NavEntry[] {
   if (role === "management") return ENTRIES;
