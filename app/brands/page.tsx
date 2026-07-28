@@ -5,6 +5,7 @@ import { getAssumptions, consignmentPortfolio } from "@/lib/breakeven";
 import { setBrandStatus, updateBreakevenAssumptions } from "./actions";
 import NewBrandForm from "./NewBrandForm";
 import PortfolioBreakeven from "./PortfolioBreakeven";
+import SubmitButton from "@/app/components/SubmitButton";
 import { rm } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -85,15 +86,15 @@ function PipelineTable({ rows }: { rows: BrandListRow[] }) {
                   {NEXT_STATUS[b.status] && (
                     <form action={setBrandStatus}>
                       <input type="hidden" name="id" value={b.id} />
-                      <button name="status" value={NEXT_STATUS[b.status]!} className="rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50">
+                      <SubmitButton name="status" value={NEXT_STATUS[b.status]!} pendingText="…" className="rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50">
                         → {STATUS_LABELS[NEXT_STATUS[b.status]!]}
-                      </button>
+                      </SubmitButton>
                     </form>
                   )}
                   {b.status !== "DROPPED" && (
                     <form action={setBrandStatus}>
                       <input type="hidden" name="id" value={b.id} />
-                      <button name="status" value="DROPPED" className="rounded px-2 py-0.5 text-xs text-rose-600 hover:underline">Drop</button>
+                      <SubmitButton name="status" value="DROPPED" pendingText="…" className="rounded px-2 py-0.5 text-xs text-rose-600 hover:underline">Drop</SubmitButton>
                     </form>
                   )}
                 </div>

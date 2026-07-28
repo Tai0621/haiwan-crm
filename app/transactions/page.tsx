@@ -4,6 +4,7 @@ import { rm, fmtDateTime } from "@/lib/format";
 import { STORE_LABELS } from "@/lib/constants";
 import AddTransactionForm from "./AddTransactionForm";
 import StoreHubSyncShortcut from "./StoreHubSyncShortcut";
+import SubmitButton from "@/app/components/SubmitButton";
 import { deleteTransaction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -126,12 +127,13 @@ export default async function TransactionsPage() {
                     <form action={deleteTransaction}>
                       <input type="hidden" name="id" value={t.id} />
                       <input type="hidden" name="returnTo" value="/transactions" />
-                      <button
+                      <SubmitButton
                         className="text-xs text-red-600 hover:underline"
                         aria-label="Delete transaction"
+                        pendingText="Deleting…"
                       >
                         Delete
-                      </button>
+                      </SubmitButton>
                     </form>
                   </td>
                 </tr>

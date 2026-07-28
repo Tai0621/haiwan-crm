@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import SubmitButton from "@/app/components/SubmitButton";
 import { brandDetail, TRIAL_WINDOW_DAYS, NEW_WINDOW_DAYS } from "@/lib/brands";
 import { brandBreakeven } from "@/lib/breakeven";
 import { updateBrand } from "../actions";
@@ -216,7 +217,7 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
           <div className="sm:col-span-3"><label className={label}>Next step</label><input name="nextStep" defaultValue={brand.nextStep ?? ""} className={input} /></div>
           <div className="sm:col-span-3"><label className={label}>Notes</label><textarea name="notes" defaultValue={brand.notes ?? ""} className={input} rows={2} /></div>
           <div className="sm:col-span-3">
-            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save changes</button>
+            <SubmitButton pendingText="Saving…" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save changes</SubmitButton>
           </div>
         </form>
       </details>
